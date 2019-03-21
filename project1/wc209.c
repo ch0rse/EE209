@@ -13,6 +13,7 @@ int main (int argc, char **argv, char **envp){
 	unsigned long numlines = 0;
 
 	char c;
+	int i = 0;
 
 	/* reads characters until EOF */
 	while((c = getchar()) && alive){
@@ -32,6 +33,7 @@ int main (int argc, char **argv, char **envp){
 				}
 
 				else if (c == '/'){
+
 					state = 4;
 				}
 
@@ -49,7 +51,7 @@ int main (int argc, char **argv, char **envp){
 
 			
 				if (prev != 1 && prev != 4){
-					//printf("reached.1 at %c\n",c);
+					//printf("reached 1 at %c, numwords=%lu (state = %d, iters = %d)\n",c,numwords,state,i);
 					numwords++;
 				}
 				//printf("%d -> %d (state %d)\n",numchars,numchars+1,state);
@@ -136,10 +138,13 @@ int main (int argc, char **argv, char **envp){
 			break;
 
 			case 4:
-				numchars++;
 
-				if ((prev == 2 || prev == 3) && c!='*' && c!=EOF) {
-					//printf("reached.2 at %c\n",c);
+				if (c != '*') {
+					numchars++;
+				}
+
+				if ((prev == 0 || prev == 2 || prev == 3) && c != '*') {
+					//printf("reached 2 at %c, numwords=%lu (state = %d, iters = %d)\n",c,numwords,state,i);
 					numwords++;
 				}
 
@@ -173,8 +178,10 @@ int main (int argc, char **argv, char **envp){
 
 			case 5:
 				comment_entryline = numlines;
-				if (prev == 4) {
-					numchars--;
+
+				if (prev != 4 && prev != 5 && prev !=6) {
+					fprintf(stderr,"UNREACHABLE CODE!!!\n");
+					exit(-1);
 				}
 				
 				prev = 5;
@@ -225,6 +232,7 @@ int main (int argc, char **argv, char **envp){
 			break;
 
 		}
+		i++;
 	}
 	printf("%lu %lu %lu\n",numlines,numwords,numchars);
 	exit (EXIT_SUCCESS);
