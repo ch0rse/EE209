@@ -52,7 +52,7 @@ int main (int argc, char **argv, char **envp){
 					//printf("reached.1 at %c\n",c);
 					numwords++;
 				}
-
+				//printf("%d -> %d (state %d)\n",numchars,numchars+1,state);
 				numchars++;
 				prev = 1;
 
@@ -79,7 +79,7 @@ int main (int argc, char **argv, char **envp){
 			break;
 
 			case 2:
-
+				//printf("%d -> %d (state %d)\n",numchars,numchars+1,state);
 				numchars++;
 				prev = 2;
 				
@@ -108,7 +108,7 @@ int main (int argc, char **argv, char **envp){
 
 			case 3:
 
-
+				//printf("%d -> %d (state %d)\n",numchars,numchars+1,state);
 				numchars++;
 				numlines++;
 				prev = 3;
@@ -217,6 +217,7 @@ int main (int argc, char **argv, char **envp){
 				}
 				else {
 					if (c == '\n') {
+						numchars++;
 						numlines++;
 					}
 					state = 5;
