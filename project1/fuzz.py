@@ -13,7 +13,8 @@ def get_testcase_output(exe_name,inpt):
 	p.stdin.write(inpt)
 	p.stdin.close()
 	out = p.stdout.read(30).strip()
-	return out
+	err = p.stderr.read(100).strip()
+	return out, err
 
 def make_dumpfile(content):
 	global numdumps
@@ -38,10 +39,10 @@ if __name__ == "__main__":
 
 	for i in range(NUMTESTS):
 		fcontent = generate_testcase (CHSET, random.randint(10,10000))
-		out1 = get_testcase_output("./wc209",fcontent)
-		out2 = get_testcase_output("./samplewc209",fcontent)
+		out1, err1 = get_testcase_output("./wc209",fcontent)
+		out2, err2 = get_testcase_output("./samplewc209",fcontent)
 
-		if(out1 != out2):
+		if(out1 != out2 or err1 != err2):
 			print("[-] testcase%d failed"%i)
 			make_dumpfile (fcontent)
 		else:
