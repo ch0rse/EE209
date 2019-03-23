@@ -13,6 +13,7 @@ int main (int argc, char **argv, char **envp){
 	int state = 0;
 	int prev = 0;
 	int alive = 1;
+	int entered_comment = 0;
 
 	unsigned long comment_entryline = 0;
 	unsigned long numchars = 0;
@@ -184,7 +185,11 @@ int main (int argc, char **argv, char **envp){
 			break;
 
 			case 5:
-				comment_entryline = numlines;
+				if (!entered_comment){
+					comment_entryline = numlines;
+					entered_comment = 1;
+				}
+				
 
 				if (prev != 4 && prev != 5 && prev !=6) {
 					fprintf(stderr,"UNREACHABLE CODE!!!\n");
@@ -223,6 +228,7 @@ int main (int argc, char **argv, char **envp){
 				}
 
 				else if (c == '/') {
+					entered_comment = 0;
 					state = 2;
 				}
 
