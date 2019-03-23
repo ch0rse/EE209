@@ -200,7 +200,7 @@ int main (int argc, char **argv, char **envp){
 
 				if (c == EOF) {
 					alive = 0;
-					fprintf(stderr,"Error: line %lu: unterminated comment\n",numlines);
+					fprintf(stderr,"Error: line %lu: unterminated comment\n",comment_entryline);
 					exit (EXIT_FAILURE);
 				}
 
