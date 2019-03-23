@@ -1,8 +1,15 @@
+/*
+Name: Woosun Song
+Student ID: 20180336
+Assignment No.1
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h> 
 
 int main (int argc, char **argv, char **envp){
+	/* reads a character one by one in a loop and changes state depending on the input character */
 	int state = 0;
 	int prev = 0;
 	int alive = 1;
