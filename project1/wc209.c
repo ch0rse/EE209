@@ -201,7 +201,7 @@ int main (int argc, char **argv, char **envp){
 				if (c == EOF) {
 					alive = 0;
 					fprintf(stderr,"Error: line %lu: unterminated comment\n",comment_entryline);
-					exit (EXIT_FAILURE);
+					return (EXIT_FAILURE);
 				}
 
 				else if (c == '*') {
@@ -224,7 +224,7 @@ int main (int argc, char **argv, char **envp){
 				if (c == EOF) {
 					alive = 0;
 					fprintf(stderr,"Error: line %lu: unterminated comment\n",comment_entryline);
-					exit (EXIT_FAILURE);
+					return (EXIT_FAILURE);
 				}
 
 				else if (c == '/') {
@@ -248,7 +248,7 @@ int main (int argc, char **argv, char **envp){
 		i++;
 	}
 	printf("%lu %lu %lu\n",numlines,numwords,numchars);
-	exit (EXIT_SUCCESS);
+	return (EXIT_SUCCESS);
 
 	return 0;
 }
