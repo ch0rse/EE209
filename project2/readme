@@ -1,0 +1,6 @@
+Name: Woosun Song
+Stduent ID: 20180336
+Assignment No.2
+
+I did the assignment individually without receiving any help or guidance.
+StrCopy can never ensure safety even if it uses assert(). This is because there is no way to determine the size of the buffer provided by the caller since it is passed as a pointer, not a struct or an object as in high level languages. The only information provided to StrCopy is the location, and therefore it is vulnerable to buffer overflows. To prevent this from happening the user must explicitly pass the length of the destination buffer as in strncpy.
