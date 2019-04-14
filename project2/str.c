@@ -1,3 +1,7 @@
+/* 20180336 송우선
+Assignment.2
+*/
+
 #include <assert.h> /* to use assert() */
 #include <stdio.h>
 #include "str.h"
@@ -23,10 +27,13 @@ size_t StrGetLength(const char* pcSrc)
   return (size_t)(pcEnd - pcSrc);
 }
 
-/*------------------------------------------------------------------------*/
+/*takes a dest pointer and source string, and copies the content of the string to the destination pointer*/
 char *StrCopy(char *pcDest, const char* pcSrc)
 {
   /* TODO: fill this function */
+  assert (pcDest);
+  assert (pcSrc);
+
   unsigned long length = StrGetLength (pcSrc);
   unsigned long i = 0;
 
@@ -39,7 +46,7 @@ char *StrCopy(char *pcDest, const char* pcSrc)
   return pcDest;
 }
 
-/*------------------------------------------------------------------------*/
+/*takes two strings and compares them, returns zero if two are identical and a nonzero value if the two are not identical*/
 int StrCompare(const char* pcS1, const char* pcS2)
 {
   unsigned long len1 = StrGetLength (pcS1);
@@ -60,7 +67,7 @@ int StrCompare(const char* pcS1, const char* pcS2)
   assert (len1 == len2);
   return 0;
 }
-/*------------------------------------------------------------------------*/
+/*searches string Needle within string Haystack*/
 char *StrSearch(const char* pcHaystack, const char *pcNeedle)
 {
   unsigned long haystack_len = StrGetLength (pcHaystack);
@@ -82,9 +89,11 @@ char *StrSearch(const char* pcHaystack, const char *pcNeedle)
 
   return NULL;
 }
-/*------------------------------------------------------------------------*/
+/*concatenates pcSrc to pcDest*/
 char *StrConcat(char *pcDest, const char* pcSrc)
 {
+  assert (pcSrc);
+
   unsigned long len1 = StrGetLength (pcDest);
   char *ptr = &pcDest[len1];
   StrCopy (ptr, pcSrc);

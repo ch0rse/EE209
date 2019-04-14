@@ -1,3 +1,6 @@
+/*20180336 송우선
+Assignment.2
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /* for skeleton code */
@@ -63,16 +66,26 @@ PrintUsage(const char* argv0)
    message to standard error
 
    NOTE: If there is any problem, return FALSE; if not, return TRUE  */
-/*-------------------------------------------------------------------*/
+
+/*reads line by line from stdin and prints the line */
 int
 DoFind(const char *pcSearch)
 {
   char buf[MAX_STR_LEN + 2]; 
   int len;
-  /* 
-   *  Fill out your variables here 
-   */
-   
+
+  len = StrGetLength (pcSearch);
+
+  if (!len) {
+    fprintf(stderr,"Error: Can't replace an empty substring\n");
+    return FALSE;
+  }
+
+  if (len > MAX_STR_LEN) {
+    fprintf(stderr,"Error: argument is too long\n");
+    return FALSE;
+  }
+
   /* Read the line by line from stdin, Note that this is an example */
   while (fgets(buf, sizeof(buf), stdin)) {
     /* check input line length */
@@ -108,6 +121,8 @@ DoFind(const char *pcSearch)
    NOTE: If there is any problem, return FALSE; if not, return TRUE  */
 /*-------------------------------------------------------------------*/
 
+
+/* prints the replaced form of orig, where all str1 is replaced to str2 */
 void 
 print_replaced_str (char *orig, const char *str1, const char *str2) {
   unsigned long i,len1,len2;
@@ -130,6 +145,7 @@ print_replaced_str (char *orig, const char *str1, const char *str2) {
   }
 }
 
+/* reads line by line and prints the replaed form of that line */
 int
 DoReplace(const char *pcString1, const char *pcString2)
 {
@@ -195,14 +211,15 @@ DoReplace(const char *pcString1, const char *pcString2)
       XX is the final line number of [filename].
 
    NOTE: If there is any problem, return FALSE; if not, return TRUE  */
-/*-------------------------------------------------------------------*/
+
+/*reads a line by line from two files, prints all lines that are different*/
 int
 DoDiff(const char *file1, const char *file2)
 {
   
   char buf1[MAX_STR_LEN + 1];
   char buf2[MAX_STR_LEN + 1];
-  unsigned long line_no = 0;
+  unsigned long line_no = 1;
 
   /* validate arguments */
   if (StrGetLength (file1) > MAX_STR_LEN || StrGetLength (file2) > MAX_STR_LEN) {
@@ -242,8 +259,8 @@ DoDiff(const char *file1, const char *file2)
     }
 
     if (StrCompare (buf1, buf2)) {
-      printf("%s@%lu:%s\n",file1, line_no, buf1);
-      printf("%s@%lu:%s\n",file2, line_no, buf2);
+      printf("%s@%lu:%s",file1, line_no, buf1);
+      printf("%s@%lu:%s",file2, line_no, buf2);
     }
 
     line_no++;
