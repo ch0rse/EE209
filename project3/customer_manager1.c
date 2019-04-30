@@ -102,7 +102,7 @@ RegisterCustomer(DB_T d, const char *id,
     void *old = (void *) d->pArray;
     unsigned old_size = d->curArrSize;
 
-    d->curArrSize+= ARRAY_INCR_STEP;
+    d->curArrSize*= 2;
 
     if (d->curArrSize <= old_size) {
       fprintf(stderr, "Integer overflow, incrementing from %u to %u is not allowed\n", old_size, d->curArrSize); 
@@ -117,7 +117,7 @@ RegisterCustomer(DB_T d, const char *id,
       return -1;  
     }
 
-    memcpy (d->pArray, old, old_size);
+    memcpy (d->pArray, old, old_size * sizeof (struct UserInfo));
   }
 
   /* add new element */
