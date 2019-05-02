@@ -14,7 +14,7 @@ struct UserInfo {
 };
 
 struct DB {
-  struct UserInfo *pArray;   // pointer to the array
+  struct UserInfo **pArray;   // pointer to the array
   unsigned int curArrSize;            // current array size (max # of elements)
   unsigned int numItems;              // # of stored items, needed to determine
 			     // # whether the array should be expanded
@@ -34,11 +34,10 @@ CreateCustomerDB(void)
     return NULL;
   }
   d->curArrSize = UNIT_ARRAY_SIZE; // start with 1024 elements
-  d->pArray = (struct UserInfo *)calloc(d->curArrSize, sizeof (struct UserInfo));
+  d->pArray = (struct UserInfo **)calloc(d->curArrSize, sizeof (struct UserInfo*));
 
   if (d->pArray == NULL) {
-    fprintf(stderr, "Can't allocate a memory for array of size %u\n",
-	    d->curArrSize);   
+    fprintf(stderr, "Can't allocate a memory for array of size %u\n", d->curArrSize);   
     free(d);
     return NULL;
   }
@@ -78,19 +77,15 @@ RegisterCustomer(DB_T d, const char *id,
 
   /* check if user already exists */
   unsigned int i;
-  char *p, *q;
 
   for (i = 0; i < d->curArrSize; i++) {
 
-    p = (d->pArray[i]).id;
-    q = (d->pArray[i]).name;
-
-    if (!p || !q) {
+    if (!d->pArray[i]) {
       /* empty */
       continue;
     }
 
-    if (!strcmp (p, id) || !strcmp (q, name)) {
+    if (!strcmp (d->pArray[i]->id, id) || !strcmp (d->pArray[i]->name, name)) {
       fprintf(stderr, "Attempt to add a user that already exists\n");
       return -1; 
     }
@@ -109,7 +104,7 @@ RegisterCustomer(DB_T d, const char *id,
       return -1;
     }
 
-    d->pArray = calloc (d->curArrSize, sizeof (struct UserInfo));
+    d->pArray = calloc (d->curArrSize, sizeof (struct UserInfo *));
 
     if (!d->pArray) {
       fprintf(stderr, "Can't allocate a memory for array of size %u\n", d->curArrSize); 
@@ -117,11 +112,12 @@ RegisterCustomer(DB_T d, const char *id,
       return -1;  
     }
 
-    memcpy (d->pArray, old, old_size * sizeof (struct UserInfo));
+    memcpy (d->pArray, old, old_size * sizeof (struct UserInfo *));
   }
 
   /* add new element */
   char *id_cpy, *name_cpy;
+  struct UserInfo *new_user;
 
   id_cpy = strdup (id);
   if (!id_cpy) {
@@ -135,17 +131,23 @@ RegisterCustomer(DB_T d, const char *id,
     return -1;
   }
 
+  new_user = calloc (1, sizeof (struct UserInfo));
+
+  if (!new_user) {
+    fprintf(stderr, "Can't allocate a memory for new user\n"); 
+    return -1;
+  }
+
+  new_user->id = id_cpy;
+  new_user->name = name_cpy;
+  new_user->purchase = purchase;
+
   /* find first nonzero entry and increment numItems */
 
   for (i = 0; i < d->curArrSize; i++) {
 
-    p = (d->pArray[i]).id;
-    q = (d->pArray[i]).name;
-
-    if (!p && !q) {
-      (d->pArray[i]).id = id_cpy;
-      (d->pArray[i]).name = name_cpy;
-      (d->pArray[i]).purchase = purchase;
+    if (!d->pArray[i]) {
+      d->pArray[i] = new_user;
       d->numItems++;
       return 0;
     }
@@ -173,19 +175,15 @@ UnregisterCustomerByID(DB_T d, const char *id)
 
   /* find customer */
   unsigned int i;
-  char *p, *q;
 
   for (i = 0; i < d->curArrSize; i++) {
-    
-    p = (d->pArray[i]).id;
-    q = (d->pArray[i]).name;
 
-    if (!p || !q) {
+    if (!d->pArray[i]) {
       /* empty */
       continue;
     }
 
-    if (!strcmp (p, id)) {
+    if (!strcmp (d->pArray[i]->id, id)) {
       break;
     }
   }
@@ -196,12 +194,11 @@ UnregisterCustomerByID(DB_T d, const char *id)
   }
 
   /* free resources */
-  free (p);
-  free (q);
-
-  (d->pArray[i]).id = NULL;
-  (d->pArray[i]).name = NULL;
-  (d->pArray[i]).purchase = 0;
+  free (d->pArray[i]->id);
+  free (d->pArray[i]->name);
+  free (d->pArray[i]);
+  d->pArray[i] = NULL;
+  d->numItems--;
 
   return 0;
 }
@@ -224,19 +221,15 @@ UnregisterCustomerByName(DB_T d, const char *name)
 
   /* find customer */
   unsigned int i;
-  char *p, *q;
 
   for (i = 0; i < d->curArrSize; i++) {
     
-    p = (d->pArray[i]).id;
-    q = (d->pArray[i]).name;
-
-    if (!p || !q) {
+    if (!d->pArray[i]) {
       /* empty */
       continue;
     }
 
-    if (!strcmp (q, name)) {
+    if (!strcmp (d->pArray[i]->name, name)) {
       break;
     }
   }
@@ -247,17 +240,16 @@ UnregisterCustomerByName(DB_T d, const char *name)
   }
 
   /* free resources */
-  free (p);
-  free (q);
-
-  (d->pArray[i]).id = NULL;
-  (d->pArray[i]).name = NULL;
-  (d->pArray[i]).purchase = 0;
+  free (d->pArray[i]->id);
+  free (d->pArray[i]->name);
+  free (d->pArray[i]);
+  d->pArray[i] = NULL;
+  d->numItems--;
 
   return 0;
 }
 /*--------------------------------------------------------------------*/
-unsigned int
+int
 GetPurchaseByID(DB_T d, const char* id)
 {
   /* return error if d == NULL */
@@ -274,19 +266,15 @@ GetPurchaseByID(DB_T d, const char* id)
 
   /* find customer */
   unsigned int i;
-  char *p, *q;
 
   for (i = 0; i < d->curArrSize; i++) {
-    
-    p = (d->pArray[i]).id;
-    q = (d->pArray[i]).name;
 
-    if (!p || !q) {
+    if (!d->pArray[i]) {
       /* empty */
       continue;
     }
 
-    if (!strcmp (p, id)) {
+    if (!strcmp (d->pArray[i]->id, id)) {
       break;
     }
   }
@@ -296,15 +284,15 @@ GetPurchaseByID(DB_T d, const char* id)
     return -1;
   }
 
-  return (d->pArray[i]).purchase;
+  return d->pArray[i]->purchase;
 }
 /*--------------------------------------------------------------------*/
-unsigned int
+int
 GetPurchaseByName(DB_T d, const char* name)
 {
   /* return error if d == NULL */
   if (!d || !name) {
-    fprintf(stderr, "GetPurchaseByID: null argument\n");
+    fprintf(stderr, "GetPurchaseByName: null argument\n");
     return -1;
   }
 
@@ -316,19 +304,15 @@ GetPurchaseByName(DB_T d, const char* name)
 
   /* find customer */
   unsigned int i;
-  char *p, *q;
 
   for (i = 0; i < d->curArrSize; i++) {
-    
-    p = (d->pArray[i]).id;
-    q = (d->pArray[i]).name;
 
-    if (!p || !q) {
+    if (!d->pArray[i]) {
       /* empty */
       continue;
     }
 
-    if (!strcmp (q, name)) {
+    if (!strcmp (d->pArray[i]->name, name)) {
       break;
     }
   }
@@ -338,7 +322,7 @@ GetPurchaseByName(DB_T d, const char* name)
     return -1;
   }
 
-  return (d->pArray[i]).purchase;
+  return d->pArray[i]->purchase;
 }
 /*--------------------------------------------------------------------*/
 int
@@ -346,7 +330,7 @@ GetSumCustomerPurchase(DB_T d, FUNCPTR_T fp)
 {
   /* return error if d == NULL */
   if (!d || !fp) {
-    fprintf(stderr, "GetPurchaseByID: null argument\n");
+    fprintf(stderr, "GetSumCustomerPurchase: null argument\n");
     return -1;
   }
 
@@ -357,22 +341,17 @@ GetSumCustomerPurchase(DB_T d, FUNCPTR_T fp)
   }
 
   /* find customer */
-  unsigned int i, r;
+  unsigned int i;
   int sum = 0;
-  char *p, *q;
 
   for (i = 0; i < d->curArrSize; i++) {
-    
-    p = (d->pArray[i]).id;
-    q = (d->pArray[i]).name;
-    r = (d->pArray[i]).purchase;
 
-    if (!p || !q) {
+    if (!d->pArray[i]) {
       /* empty */
       continue;
     }
 
-    sum += fp (p, q, r);
+    sum += fp (d->pArray[i]->id, d->pArray[i]->name, d->pArray[i]->purchase);
   }
   
   return sum;

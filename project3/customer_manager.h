@@ -32,10 +32,10 @@ int UnregisterCustomerByID(DB_T d, const char *id);
 int UnregisterCustomerByName(DB_T d, const char *name);
 
 /* get the purchase amount of a user whose ID is 'id' */
-unsigned int GetPurchaseByID(DB_T d, const char* id);
+int GetPurchaseByID(DB_T d, const char* id);
 
 /* get the purchase amount of a user whose name is 'name' */
-unsigned int GetPurchaseByName(DB_T d, const char* name);
+int GetPurchaseByName(DB_T d, const char* name);
 
 /* iterate all valid user items once, evaluate fp for each valid user
    and return the sum of all fp function calls */
