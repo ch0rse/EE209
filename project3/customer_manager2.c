@@ -81,10 +81,7 @@ static int list_iterate_id (struct UserInfo *head, FUNCPTR_T fp) {
   return retval;
 }
 
-
-/*--------------------------------------------------------------------*/
-DB_T
-CreateCustomerDB(void)
+static DB_T CreateCustomerDB_s (int bucketCount)
 {
   DB_T d;
   unsigned int i;
@@ -96,7 +93,7 @@ CreateCustomerDB(void)
     return NULL;
   }
 
-  d->bucketCount = INITIAL_BUCKET_CNT;
+  d->bucketCount = bucketCount;
   d->numItems = 0;
 
   d->hashtable_id = (struct UserInfo **)calloc (d->bucketCount, sizeof(struct UserInfo *));
@@ -137,14 +134,11 @@ CreateCustomerDB(void)
 
     d->hashtable_name[i] = head;
   }
-
-
   
   return d;
 }
-/*--------------------------------------------------------------------*/
-void
-DestroyCustomerDB(DB_T d)
+
+static void DestroyDB_ContentsOnly(DB_T d)
 {
   /* do nothing if d == NULL */
   if (!d) {
@@ -152,7 +146,21 @@ DestroyCustomerDB(DB_T d)
   }
 
   /* free all entries */
+  int i;
+  struct UserInfo *u,*prev;
 
+  for (i = 0; i<d->bucketCount; i++) {
+    u = d->hashtable_id[i]->next_id;
+    while (u) {
+      prev = u;
+      u = u->next_id;
+      free (prev->id);
+      free (prev->name);
+      free (prev);
+    }
+  }
+
+  /* free array */
   if (d->hashtable_id) {
     free (d->hashtable_id);
   }
@@ -161,7 +169,63 @@ DestroyCustomerDB(DB_T d)
     free (d->hashtable_name);
   }
 
-  free (d);
+}
+
+static int rehash (DB_T d) {
+
+  int i;
+  struct UserInfo *u;
+  DB_T old = d;
+  DB_T new;
+
+  new = CreateCustomerDB_s (old->bucketCount*2);
+
+  if (!new) {
+    return 0;
+  }
+
+  for (i = 0; i < old->bucketCount; i++) {
+    u = old->hashtable_id[i]->next_id;
+
+    while (u) {
+
+      if (RegisterCustomer(new, u->id, u->name, u->purchase) == -1){
+        DestroyCustomerDB (new);
+        return 0;
+      }
+      u = u->next_id;
+    }
+  }
+
+  DestroyDB_ContentsOnly (old);
+
+  old->bucketCount = new->bucketCount;
+  old->hashtable_id = new->hashtable_id;
+  old->hashtable_name = new->hashtable_name;
+  old->bucketCount = new->bucketCount;
+
+  return 1;
+
+}
+
+
+/*--------------------------------------------------------------------*/
+DB_T
+CreateCustomerDB(void)
+{
+  return CreateCustomerDB_s (INITIAL_BUCKET_CNT);
+}
+/*--------------------------------------------------------------------*/
+void
+DestroyCustomerDB(DB_T d)
+{
+  /* do nothing if d == NULL */
+  DestroyDB_ContentsOnly (d);
+
+  if (d) {
+    free (d);
+  }
+  
 }
 /*--------------------------------------------------------------------*/
 int
@@ -186,6 +250,18 @@ RegisterCustomer(DB_T d, const char *id,
   }
 
   /* hashtable expansion */
+  if (d->numItems > (int)((float)d->bucketCount*0.75)) {
+
+    if (d->bucketCount > d->bucketCount*2) {
+      fprintf(stderr, "RegisterCustomer: integer overflow expected\n");
+      return -1;
+    }
+
+    if (!rehash (d)) {
+      fprintf(stderr, "RegisterCustomer: rehash fail\n");
+      return -1;
+    }
+  }
 
   /* add new element */
   char *id_cpy, *name_cpy;
