@@ -1,3 +1,4 @@
+/* 20180336 Woosun Song */
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -38,6 +39,7 @@ static unsigned int hash_function(const char *pcKey, int iBucketCount)
    return (uiHash % (unsigned int)iBucketCount);
 }
 
+/* find a user from hash table using id */
 static struct UserInfo *find_user_by_id (DB_T d, const char *id) {
 
   unsigned int hash = hash_function (id, d->bucketCount);
@@ -54,6 +56,7 @@ static struct UserInfo *find_user_by_id (DB_T d, const char *id) {
 
 }
 
+/* find a user by name from hash table */
 static struct UserInfo *find_user_by_name (DB_T d, const char *name) {
 
   unsigned int hash = hash_function (name, d->bucketCount);
@@ -69,6 +72,7 @@ static struct UserInfo *find_user_by_name (DB_T d, const char *name) {
   return NULL;
 }
 
+/* iterate list with id_next and execute fp for each entry */
 static int list_iterate_id (struct UserInfo *head, FUNCPTR_T fp) {
 
   int retval = 0;
@@ -81,6 +85,7 @@ static int list_iterate_id (struct UserInfo *head, FUNCPTR_T fp) {
   return retval;
 }
 
+/* create customerdb with bucket count specified */
 static DB_T CreateCustomerDB_s (int bucketCount)
 {
   DB_T d;
@@ -138,6 +143,7 @@ static DB_T CreateCustomerDB_s (int bucketCount)
   return d;
 }
 
+/* only remove DB contents */
 static void DestroyDB_ContentsOnly(DB_T d)
 {
   /* do nothing if d == NULL */
@@ -171,6 +177,7 @@ static void DestroyDB_ContentsOnly(DB_T d)
 
 }
 
+/* rehash the db to double the bucket count */
 static int rehash (DB_T d) {
 
   int i;
@@ -233,8 +240,8 @@ RegisterCustomer(DB_T d, const char *id,
      const char *name, const int purchase)
 {
   /* return error if d == NULL */
-  if (!d || !id || !name) {
-    fprintf(stderr, "RegisterCustomer: null argument\n");
+  if (!d || !id || !name || purchase <= 0) {
+    fprintf(stderr, "RegisterCustomer: invalid argument\n");
     return -1;
   }
 

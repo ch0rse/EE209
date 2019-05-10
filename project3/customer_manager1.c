@@ -1,3 +1,4 @@
+/* 20180336 Woosun Song */
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -65,7 +66,7 @@ RegisterCustomer(DB_T d, const char *id,
 		 const char *name, const int purchase)
 {
   /* return error if d == NULL */
-  if (!d || !id || !name) {
+  if (!d || !id || !name || purchase <= 0) {
     return -1;
   }
 
