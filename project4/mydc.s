@@ -14,6 +14,9 @@ scanfFormat:
 
 printfFormat:
 	.asciz "%d\n"
+
+stackEmptyStr:
+	.asciz "dc: stack empty"
 ### --------------------------------------------------------------------
 
         .section ".data"
@@ -78,6 +81,20 @@ pushval:
 
 	# increment ele_cnt
 	call incr_cnt
+	jmp input
+
+push_signedval:
+	## push a number onto the stack, discluding the sign
+	mov $buffer, %edi
+	inc %edi
+	pushl %edi
+	call atoi
+	add $4, %esp
+	pushl %eax
+
+	# increment ele_cnt
+	call incr_cnt
+	jmp input
 
 operator:
 	## handle operators, if not handle commands such as p,q,f...
@@ -86,6 +103,9 @@ operator:
 	movb (%edi), %cl
 
 	## remember, all of these operation jumps returns back to input loop
+	cmp $'_',%cl # +
+	je push_signedval
+
 	cmp $'+',%cl # +
 	je oper_add
 
@@ -95,27 +115,27 @@ operator:
 	cmp $'*',%cl # *
 	je oper_mul
 
-	#cmp %ecx, '/'
-	#je oper_div
+	cmp $'/',%cl
+	je oper_div
 
-	#cmp %ecx, '%'
-	#je oper_mod
+	cmp $'%',%cl
+	je oper_mod
 
-	#cmp %ecx, '^'
-	#je oper_pow
+	cmp $'^',%cl
+	je oper_pow
 
 command:
 	cmp $'q',%cl #
 	je quit
-
-	cmp $'p',%cl  #
-	je print_top
 
 	cmp $'f',%cl  #
 	je print_stack
 
 	cmp $'c',%cl  #
 	je clear_stack
+
+	cmp $'p',%cl  #
+	je print_top
 
 	cmp $'d',%cl  #
 	je duplicate_top
@@ -127,6 +147,9 @@ command:
 	jmp input
 
 oper_add:
+	mov (ele_cnt),%edi
+	cmp $2, %edi
+	jb stack_empty_error
 	pop %edi
 	pop %esi
 	add %esi, %edi
@@ -135,6 +158,9 @@ oper_add:
 	jmp input
 
 oper_sub:
+	mov (ele_cnt),%edi
+	cmp $2, %edi
+	jb stack_empty_error
 	pop %edi
 	pop %esi
 	sub %esi, %edi
@@ -143,15 +169,54 @@ oper_sub:
 	jmp input
 
 oper_mul:
-	pop %edi
+	mov (ele_cnt),%edi
+	cmp $2, %edi
+	jb stack_empty_error
+	pop %eax
 	pop %esi
-	imul %esi, %edi
-	pushl %edi
+	imul %esi
+	pushl %eax
+	call dec_cnt
+	jmp input
+
+oper_div:
+	mov (ele_cnt),%edi
+	cmp $2, %edi
+	jb stack_empty_error
+	xor %edx,%edx
+	pop %esi
+	pop %eax
+	idiv %esi
+	pushl %eax
+	call dec_cnt
+	jmp input
+
+oper_mod:
+	mov (ele_cnt),%edi
+	cmp $2, %edi
+	jb stack_empty_error
+	xor %edx,%edx
+	pop %esi
+	pop %eax
+	idiv %esi
+	pushl %edx
+	call dec_cnt
+	jmp input
+
+oper_pow:
+	mov (ele_cnt),%edi
+	cmp $2, %edi
+	jb stack_empty_error
+	call pow
+	push %eax
 	call dec_cnt
 	jmp input
 
 
 print_top:
+	mov (ele_cnt),%edi
+	test %edi,%edi
+	jz stack_empty_error
 	movl (%esp),%ecx
 	pushl %ecx
 	pushl $printfFormat
@@ -182,6 +247,9 @@ clear_stack:
 	jmp input
 
 duplicate_top:
+	mov (ele_cnt),%edi
+	test %edi,%edi
+	jz stack_empty_error
 	pop %ecx
 	push %ecx
 	push %ecx
@@ -189,10 +257,19 @@ duplicate_top:
 	jmp input
 
 reverse_top:
+	mov (ele_cnt),%edi
+	cmp $2, %edi
+	jb stack_empty_error
 	pop %edi
 	pop %esi
 	push %edi
 	push %esi
+	jmp input
+
+stack_empty_error:
+	pushl $stackEmptyStr
+	call puts
+	add $4, %esp	
 	jmp input
 
 
@@ -207,6 +284,25 @@ dec_cnt:
 	dec %edx
 	movl %edx, (ele_cnt)
 	ret
+
+pow:
+	# first argument is exponenet, second argument is base
+	mov 4(%esp),%esi
+	mov 8(%esp),%edi
+	mov $1,%eax
+	
+	# check if exponenet is positive
+
+	# i = %ecx
+	xor %ecx,%ecx
+	pow_loop:
+		cmp %ecx,%esi
+		jbe pow_end
+		inc %ecx
+		imul %edi
+		jmp pow_loop
+	pow_end:
+		ret
 
 
 quit:	
