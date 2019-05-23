@@ -16,7 +16,7 @@ printfFormat:
 	.asciz "%d\n"
 
 stackEmptyStr:
-	.asciz "dc: stack empty"
+	.asciz "dc: stack empty\n"
 ### --------------------------------------------------------------------
 
         .section ".data"
@@ -90,6 +90,7 @@ push_signedval:
 	pushl %edi
 	call atoi
 	add $4, %esp
+	neg %eax
 	pushl %eax
 
 	# increment ele_cnt
@@ -267,8 +268,9 @@ reverse_top:
 	jmp input
 
 stack_empty_error:
+	pushl stderr
 	pushl $stackEmptyStr
-	call puts
+	call fputs
 	add $4, %esp	
 	jmp input
 
@@ -289,11 +291,16 @@ pow:
 	# first argument is exponenet, second argument is base
 	mov 4(%esp),%esi
 	mov 8(%esp),%edi
-	mov $1,%eax
 	
-	# check if exponenet is positive
+	
+	# check if exponenet is non-negative, if exponent is negative return the base
+	mov %edi,%eax
+	cmp $0, %esi
+	jle pow_end
 
+	
 	# i = %ecx
+	mov $1,%eax
 	xor %ecx,%ecx
 	pow_loop:
 		cmp %ecx,%esi
