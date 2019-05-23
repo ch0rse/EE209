@@ -17,7 +17,9 @@ printfFormat:
 ### --------------------------------------------------------------------
 
         .section ".data"
-		ele_cnt DD 0
+
+ele_cnt:
+	.word 0
 
 ### --------------------------------------------------------------------
 
@@ -58,7 +60,8 @@ input:
 	
 	## check if first character is digit
 	movl $buffer, %edi
-	movb %(edi), %ecx
+	xor %ecx,%ecx
+	movb (%edi), %cl
 	pushl %ecx
 	call isdigit
 	add $4, %esp
@@ -71,25 +74,28 @@ pushval:
 	pushl $buffer
 	call atoi
 	add $4, %esp
-	push %eax
+	pushl %eax
 
 	## increment ele_cnt
-	inc ele_cnt
+	#movl $ele_cnt, %edx
+	#inc %edx
+	#movl %edx, $ele_cnt
 	jmp input
 
 operator:
 	## handle operators, if not handle commands such as p,q,f...
 	movl $buffer, %edi
-	movb %(edi), %ecx
+	xor %ecx,%ecx
+	movb (%edi), %cl
 
 	## remember, all of these operation jumps returns back to input loop
-	cmp %ecx, '+'
+	cmp %cl, '+'
 	je oper_add
 
-	cmp %ecx, '-'
+	cmp %cl, '-'
 	je oper_sub
 
-	cmp %ecx, '*'
+	cmp %cl, '*'
 	je oper_mul
 
 	#cmp %ecx, '/'
@@ -112,29 +118,29 @@ command:
 	jmp input
 
 oper_add:
-	popl $edi
-	popl %esi
+	pop %edi
+	pop %esi
 	add %esi, %edi
 	pushl %edi
 	jmp input
 
 oper_sub:
-	popl $edi
-	popl %esi
+	pop %edi
+	pop %esi
 	sub %esi, %edi
 	pushl %edi
 	jmp input
 
 oper_mul:
-	popl $edi
-	popl %esi
+	pop %edi
+	pop %esi
 	imul %esi, %edi
 	pushl %edi
 	jmp input
 
 
 print_top:
-	movl %ecx, %(esp)
+	movl %ecx, (%esp)
 	pushl %ecx
 	pushl $printfFormat
 	call printf
