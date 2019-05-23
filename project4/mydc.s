@@ -10,7 +10,7 @@
 .section ".rodata"
 
 scanfFormat:
-	.asciz "%s"
+	.asciz "%20s"
 
 printfFormat:
 	.asciz "%d\n"
@@ -89,13 +89,13 @@ operator:
 	movb (%edi), %cl
 
 	## remember, all of these operation jumps returns back to input loop
-	cmp %cl, '+'
+	cmp $'+',%cl # +
 	je oper_add
 
-	cmp %cl, '-'
+	cmp $'-',%cl  # - 
 	je oper_sub
 
-	cmp %cl, '*'
+	cmp $'*',%cl # *
 	je oper_mul
 
 	#cmp %ecx, '/'
@@ -108,10 +108,10 @@ operator:
 	#je oper_pow
 
 command:
-	cmp %ecx, 'q'
+	cmp $'q',%cl # +
 	je quit
 
-	cmp %ecx, 'p'
+	cmp $'p',%cl  # - 
 	je print_top
 
 	## unhandled case
@@ -140,11 +140,12 @@ oper_mul:
 
 
 print_top:
-	movl %ecx, (%esp)
+	movl (%esp),%ecx
 	pushl %ecx
 	pushl $printfFormat
 	call printf
 	add $8, %esp
+	jmp input
 
 quit:	
 	## return 0
