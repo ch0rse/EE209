@@ -76,11 +76,8 @@ pushval:
 	add $4, %esp
 	pushl %eax
 
-	## increment ele_cnt
-	#movl $ele_cnt, %edx
-	#inc %edx
-	#movl %edx, $ele_cnt
-	jmp input
+	# increment ele_cnt
+	call incr_cnt
 
 operator:
 	## handle operators, if not handle commands such as p,q,f...
@@ -108,11 +105,23 @@ operator:
 	#je oper_pow
 
 command:
-	cmp $'q',%cl # +
+	cmp $'q',%cl #
 	je quit
 
-	cmp $'p',%cl  # - 
+	cmp $'p',%cl  #
 	je print_top
+
+	cmp $'f',%cl  #
+	je print_stack
+
+	cmp $'c',%cl  #
+	je clear_stack
+
+	cmp $'d',%cl  #
+	je duplicate_top
+
+	cmp $'r',%cl  #
+	je reverse_top
 
 	## unhandled case
 	jmp input
@@ -122,6 +131,7 @@ oper_add:
 	pop %esi
 	add %esi, %edi
 	pushl %edi
+	call dec_cnt
 	jmp input
 
 oper_sub:
@@ -129,6 +139,7 @@ oper_sub:
 	pop %esi
 	sub %esi, %edi
 	pushl %edi
+	call dec_cnt
 	jmp input
 
 oper_mul:
@@ -136,6 +147,7 @@ oper_mul:
 	pop %esi
 	imul %esi, %edi
 	pushl %edi
+	call dec_cnt
 	jmp input
 
 
@@ -146,6 +158,56 @@ print_top:
 	call printf
 	add $8, %esp
 	jmp input
+
+print_stack:
+	# %edi is iterator
+	xor %edi,%edi
+	loop:
+		cmp %edi,(ele_cnt)
+		jbe input
+		movl (%esp,%edi,4), %ecx
+		pushl %ecx
+		pushl $printfFormat
+		call printf
+		add $8, %esp
+		inc %edi
+		jmp loop
+
+clear_stack:
+	movl (ele_cnt), %edi
+	imul $4,%edi
+	add %edi,%esp
+	xor %edi,%edi
+	movl %edi, (ele_cnt)
+	jmp input
+
+duplicate_top:
+	pop %ecx
+	push %ecx
+	push %ecx
+	call incr_cnt
+	jmp input
+
+reverse_top:
+	pop %edi
+	pop %esi
+	push %edi
+	push %esi
+	jmp input
+
+
+incr_cnt:
+	movl (ele_cnt), %edx
+	inc %edx
+	movl %edx, (ele_cnt)
+	ret
+
+dec_cnt:
+	movl (ele_cnt), %edx
+	dec %edx
+	movl %edx, (ele_cnt)
+	ret
+
 
 quit:	
 	## return 0
