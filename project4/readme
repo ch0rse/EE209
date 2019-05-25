@@ -1,0 +1,23 @@
+20180336 Woosun Song
+I did not get any external assistance for this project.
+
+==== Contraversial Test Cases ====
+I used a random testcase generator (`fuzz.py`) to test my executable. Basically it creates meaningful input and compares the output of the `mydc` binary with the `dc` binary. In most cases the output was equal but there were mainly 2 cases that showed different output.
+
+1. alphanumeric input handling
+
+```
+p3333
+p
+```
+
+If you enter the test case above to dc, the output is 3333, because the line p3333 adds the nubmer 3333 to the stack. However mydc does not, so it doesn't print anything. According to the manual, only the first character is considered in alphanumerically mixed input, so I didn't fix mydc.s so that it works in the same way dc does.
+
+2. Pow functionality
+
+Also dc handles integer overflows in pow, probably using an internal array. When the arguments to pow is large, for example 426^113, dc prints the exact result while mydc prints the truncated (mod 2**32) one.
+
+
+==== Output Issues ====
+Because dc prints `dc: stack empty` to `stderr` I made `mydc` do so as well. Therefore if I get a very low grade, it may be because of this. (Automatic grading script may only capture output from stdout)
+
