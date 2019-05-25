@@ -6,9 +6,9 @@ import os
 def random_int():
 	sign = random.randint(0,1)
 	if sign:
-		return "_"+str(random.randint(1,1000))
+		return "_"+str(random.randint(0,1000))
 	else:
-		return str(random.randint(1,1000))
+		return str(random.randint(0,1000))
 
 def anomaly():
 	return os.urandom(16)

@@ -184,10 +184,10 @@ oper_div:
 	mov (ele_cnt),%edi
 	cmp $2, %edi
 	jb stack_empty_error
-	xor %edx,%edx
 	pop %esi
 	pop %eax
-	idiv %esi
+	cdq
+	idivl %esi
 	pushl %eax
 	call dec_cnt
 	jmp input
@@ -196,10 +196,10 @@ oper_mod:
 	mov (ele_cnt),%edi
 	cmp $2, %edi
 	jb stack_empty_error
-	xor %edx,%edx
 	pop %esi
 	pop %eax
-	idiv %esi
+	cdq
+	idivl %esi
 	pushl %edx
 	call dec_cnt
 	jmp input
@@ -294,9 +294,8 @@ pow:
 	
 	
 	# check if exponenet is non-negative, if exponent is negative return the base
-	mov %edi,%eax
 	cmp $0, %esi
-	jle pow_end
+	jl pow_exp_negative
 
 	
 	# i = %ecx
@@ -309,6 +308,9 @@ pow:
 		imul %edi
 		jmp pow_loop
 	pow_end:
+		ret
+	pow_exp_negative:
+		xor %eax,%eax # if exponent is negative set return value to 0
 		ret
 
 
