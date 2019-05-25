@@ -271,7 +271,7 @@ stack_empty_error:
 	pushl stderr
 	pushl $stackEmptyStr
 	call fputs
-	add $4, %esp	
+	add $8, %esp	
 	jmp input
 
 
