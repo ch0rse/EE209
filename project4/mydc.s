@@ -164,8 +164,8 @@ oper_sub:
 	jb stack_empty_error
 	pop %edi
 	pop %esi
-	sub %esi, %edi
-	pushl %edi
+	sub %edi, %esi
+	pushl %esi
 	call dec_cnt
 	jmp input
 
