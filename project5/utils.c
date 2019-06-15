@@ -2,25 +2,30 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <pwd.h>
 #include "utils.h"
 
 #define PROMPT_LEN 2
 
 static char prompt_str[] = "% ";
 
-/* my implementation of strdup, using malloc */
+char *get_homedir(){
 
-static char *strdup(const char *ori) {
-	size_t len = strlen(ori)+1;
-	char *out = malloc(len);
+	char *homedir;
 
-	if (!out) {
-		perror("malloc");
-		return NULL;
+	if ((homedir = getenv("HOME")) == NULL) {
+
+		struct passwd *p;
+    	p = getpwuid(getuid());
+
+    	if (!p) {
+    		perror("getpwuid");
+    		return NULL;
+    	}
+    	homedir = p->pw_dir;
 	}
 
-	strncpy(out, ori, len);
-	return out;
+	return homedir;
 }
 
 int prompt() {
@@ -32,7 +37,7 @@ int prompt() {
 	return 1;
 }
 
-char *getline() {
+char *read_cmdline() {
 
 	char buf[MAX_CMDLINE_LEN];
 

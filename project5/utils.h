@@ -5,4 +5,4 @@
 /* prints prompt, returns 1 on success and 0 on failure */
 int prompt();
 /* reads a line from stdin*/
-char *getline();
+char *read_cmdline();

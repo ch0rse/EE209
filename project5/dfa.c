@@ -334,7 +334,7 @@ int tokenize (char *cmdline, char ***token_ptr, size_t *len_ptr) {
       DynArray_map(oTokens, freeToken_preserve_pcvalue, NULL);
       DynArray_free(oTokens);
 
-      *len_ptr = len;
+      *len_ptr = len-1;
       *token_ptr = argv;
       return 1;
    }

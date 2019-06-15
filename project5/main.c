@@ -6,12 +6,61 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <pwd.h>
+#include <time.h>
 #include "dynarray.h"
 #include "main.h"
 #include "utils.h"
 #include "dfa.h"
 
 extern char **environ;
+static time_t last_time = 0;
+
+void sigint_handler(int signo) {
+	/* do nothing */
+	return;
+}
+
+void sigquit_handler(int signo) {
+
+	time_t current_time = time(NULL);
+	
+	if (current_time - last_time <= 5) {
+		exit(0);
+	} else {
+		last_time = current_time;
+		printf("Type Ctrl-\\ again within 5 seconds to exit.\n");
+	}
+}
+
+void handle_setenv (char **argv) {
+	if(setenv(argv[1],argv[2],1) == -1) {
+		perror("setenv");
+	}
+}
+void handle_unsetenv (char **argv) {
+	if(unsetenv(argv[1]) == -1) {
+		perror("unsetenv");
+	}
+}
+void handle_cd (char **argv) {
+	if (!argv[1]) {
+		/* cd to home directory */
+		char *homedir = get_homedir();
+		if (!homedir) {
+			fputs("cd: could not locate home directory\n",stderr);
+			return;
+		}
+
+		if (chdir(homedir) == -1) {
+			perror("chdir");
+			return;
+		}
+	}
+
+	else if(chdir(argv[1]) == -1) {
+		perror("chdir");
+	}
+}
 
 void eval(char *cmdline) {
 	char **tokens;
@@ -25,6 +74,32 @@ void eval(char *cmdline) {
 	}
 	
 	/* check for builtins */
+	if (!strcmp(tokens[0],"setenv")) {
+		if (len < 3) {
+			fputs("setenv requires at least 2 arguments\n",stderr);
+			return;
+		}
+		handle_setenv(tokens);
+		return;
+	}
+
+	if (!strcmp(tokens[0],"unsetenv")) {
+		if (len < 2) {
+			fputs("unsetenv requires at least 1 argument\n",stderr);
+			return;
+		}
+		handle_unsetenv(tokens);
+		return;
+	}
+
+	if (!strcmp(tokens[0],"cd")) {
+		handle_cd(tokens);
+		return;
+	}
+
+	if (!strcmp(tokens[0],"exit")) {
+		exit(0);
+	}
 	/* if not in builtin, exeute it */
 
 	pid = fork();
@@ -39,6 +114,18 @@ void eval(char *cmdline) {
 	}
 
 	if (!pid) {
+
+		/* remove all signal handlers */
+		if (signal(SIGINT, NULL) == SIG_ERR) {
+			perror("signal");
+			return;
+		}
+
+		if (signal(SIGQUIT, NULL) == SIG_ERR) {
+			perror("signal");
+			return;
+		}
+
 		if (execvp(tokens[0], tokens) == -1) {
 			perror("execve");
 		}
@@ -53,10 +140,7 @@ void eval(char *cmdline) {
 			free(tokens[i]);
 		}
 		free(tokens);
-	}
-	
-
-	
+	}	
 }
 
 int ish_init() {
@@ -65,16 +149,23 @@ int ish_init() {
 	FILE *fp;
 	char line_buf[MAX_CMDLINE_LEN];
 
-	if ((homedir = getenv("HOME")) == NULL) {
-		struct passwd *p;
-    	p = getpwuid(getuid());
+	/* first install signal handlers they will be inherited to children so make sure to remove them before execve*/
+	if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+		perror("signal");
+		return 0;
+	}
+	
+	if (signal(SIGQUIT, sigquit_handler) == SIG_ERR) {
+		perror("signal");
+		return 0;
+	}
 
-    	if (!p) {
-    		perror("getpwuid");
-    		return 0;
-    	}
+	/* read .ishrc and eval each line */
 
-    	homedir = p->pw_dir;
+	homedir = get_homedir();
+
+	if (!homedir) {
+		return 0;
 	}
 
 	size_t len = strlen(homedir) + strlen("/.ishrc") + 10;
@@ -116,7 +207,7 @@ int main(int argc, char **argv) {
 			continue;
 		}
 
-		char *cmdline = getline();
+		char *cmdline = read_cmdline();
 		if (!cmdline) {
 			fputs("getline failed\n",stderr);
 		} else {
