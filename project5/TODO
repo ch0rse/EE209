@@ -1,6 +1,5 @@
 must implement:
 
-1. task manager
-2. signal handler
-3. builtins
-4. slash handling
+1. allow special characters
+2. error handling based on manual
+3. pipes
