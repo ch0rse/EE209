@@ -9,6 +9,16 @@
 
 static char prompt_str[] = "% ";
 
+void dump_stack(char **args) {
+	size_t i;
+	for (i = 0;;i++) {
+		if(!args[i]){
+			break;
+		}
+		printf("%02lx: %s\n",i,args[i]);
+	}
+}
+
 char *get_homedir(){
 
 	char *homedir;

@@ -149,6 +149,50 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                eState = STATE_START;
             }
 
+            else if (c == '>') {
+               acValue[0] = '>';
+               acValue[1] = '\0';
+
+               psToken = makeToken(TOKEN_PIPE, acValue);
+
+               if (psToken == NULL)
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+
+               if (! DynArray_add(oTokens, psToken))
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+
+               iValueIndex = 0;
+               eState = STATE_START;
+            }
+
+            else if (c == '<') {
+               acValue[0] = '<';
+               acValue[1] = '\0';
+
+               psToken = makeToken(TOKEN_PIPE, acValue);
+
+               if (psToken == NULL)
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+
+               if (! DynArray_add(oTokens, psToken))
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+
+               iValueIndex = 0;
+               eState = STATE_START;
+            }
+
             else if (isprint(c))
             {
                iValueIndex = 0;
@@ -255,6 +299,78 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                }
                /* next add pipe token */
                acValue[0] = '|';
+               acValue[1] = '\0';
+
+               psToken = makeToken(TOKEN_PIPE, acValue);
+
+               if (psToken == NULL)
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+
+               if (! DynArray_add(oTokens, psToken))
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+
+               iValueIndex = 0;
+               eState = STATE_START;
+            }
+
+            else if (c == '>') {
+               /* first, make token of current word */
+               acValue[iValueIndex] = '\0';
+               psToken = makeToken(TOKEN_WORD, acValue);
+               if (psToken == NULL)
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+               if (! DynArray_add(oTokens, psToken))
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+               /* next add pipe token */
+               acValue[0] = '>';
+               acValue[1] = '\0';
+
+               psToken = makeToken(TOKEN_PIPE, acValue);
+
+               if (psToken == NULL)
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+
+               if (! DynArray_add(oTokens, psToken))
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+
+               iValueIndex = 0;
+               eState = STATE_START;
+            }
+
+            else if (c == '<') {
+               /* first, make token of current word */
+               acValue[iValueIndex] = '\0';
+               psToken = makeToken(TOKEN_WORD, acValue);
+               if (psToken == NULL)
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+               if (! DynArray_add(oTokens, psToken))
+               {
+                  fprintf(stderr, "Cannot allocate memory\n");
+                  return FALSE;
+               }
+               /* next add pipe token */
+               acValue[0] = '<';
                acValue[1] = '\0';
 
                psToken = makeToken(TOKEN_PIPE, acValue);

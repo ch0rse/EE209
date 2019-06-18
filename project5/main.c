@@ -74,12 +74,13 @@ void free_tokens(char **tokens, size_t len) {
 	free(tokens);
 }
 
-void pexec_r(char **largs, char **rargs) {
+void pexec_r(char **largs, char **rargs, int readpipe) {
 	/* get the output of largs and write it to pipe*/
 	int pipefd[2];
 	int pipe_exists = 0;
 	pid_t pid;
 	size_t i;
+
 
 	if (pipe(pipefd)){
 		perror("pipe");
@@ -94,6 +95,12 @@ void pexec_r(char **largs, char **rargs) {
 
 	if (!pid) {
 		/* child process, dup2, close reading pipe and execute */
+		if (readpipe != -1) {
+			if (dup2(readpipe,0) != 0) {
+				perror("dup2");
+				return;
+			}
+		}
 		if (dup2(pipefd[1],1) != 1){
 			perror("dup2");
 			return;
@@ -175,6 +182,11 @@ void pexec_r(char **largs, char **rargs) {
 				}
 			}	
 		}
+		/* if pipe does exist, call pexec_r in a recursive manner */
+		else {
+			/* must connect with pipefd[0]<-stdin */
+			pexec_r(&rargs[0],&rargs[i+1], pipefd[0]);	
+		}
 	
 		/* wait for child to end */
 		if (waitpid(pid, NULL, 0) < 0) {
@@ -229,8 +241,8 @@ void eval(char *cmdline) {
 	
 	/* check for builtins */
 	if (!strcmp(tokens[0],"setenv")) {
-		if (len < 3) {
-			fputs("setenv requires at least 2 arguments\n",stderr);
+		if (len !=2 || len != 3) {
+			fputs("setenv requires 1 or 2 arguments\n",stderr);
 			return;
 		}
 		handle_setenv(tokens);
@@ -238,8 +250,8 @@ void eval(char *cmdline) {
 	}
 
 	if (!strcmp(tokens[0],"unsetenv")) {
-		if (len < 2) {
-			fputs("unsetenv requires at least 1 argument\n",stderr);
+		if (len != 2) {
+			fputs("unsetenv takes 1 argument\n",stderr);
 			return;
 		}
 		handle_unsetenv(tokens);
@@ -262,7 +274,7 @@ void eval(char *cmdline) {
 		}
 		if (tokens[i][0] == '|') {
 			tokens[i] = NULL;
-			pexec_r(&tokens[0], &tokens[i+1]);
+			pexec_r(&tokens[0], &tokens[i+1],-1);
 			pipe_exists = 1;
 			break;
 		}

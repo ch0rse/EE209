@@ -6,3 +6,5 @@
 int prompt();
 /* reads a line from stdin*/
 char *read_cmdline();
+/* for debug purposes, dump argv */
+void dump_stack(char **args);
