@@ -117,12 +117,7 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
          case STATE_START:
             if ((c == '\n') || (c == '\0'))
                return TRUE;
-            else if (isalnum(c))
-            {
-               iValueIndex = 0;
-               acValue[iValueIndex++] = c;
-               eState = STATE_IN_WORD;
-            }
+            
             else if (isspace(c))
                eState = STATE_START;
 
@@ -154,6 +149,13 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                eState = STATE_START;
             }
 
+            else if (isprint(c))
+            {
+               iValueIndex = 0;
+               acValue[iValueIndex++] = c;
+               eState = STATE_IN_WORD;
+            }
+
             else
             {
                fprintf(stderr, "Invalid line at %c\n",c);
@@ -162,12 +164,8 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
             break;
 
          case STATE_IN_DQ:
-            if (isalnum(c) || isspace(c))
-            {
-               acValue[iValueIndex++] = c;
-               eState = STATE_IN_DQ;
-            }
-            else if (c == '"') {
+            
+            if (c == '"') {
                acValue[iValueIndex++] = c;
                acValue[iValueIndex] = '\0';
                psToken = makeToken(TOKEN_DQ, acValue);
@@ -187,6 +185,13 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                iValueIndex = 0;
                eState = STATE_START;
             }
+
+            else if (isprint(c))
+            {
+               acValue[iValueIndex++] = c;
+               eState = STATE_IN_DQ;
+            }
+
             else {
                fprintf(stderr, "Invalid line at %c\n",c);
                return FALSE;
@@ -213,11 +218,7 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
                return TRUE;
             }
-            else if (isalnum(c))
-            {
-               acValue[iValueIndex++] = c;
-               eState = STATE_IN_WORD;
-            }
+            
             else if (isspace(c))
             {
                /* Create a WORD token. */
@@ -272,6 +273,12 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
                iValueIndex = 0;
                eState = STATE_START;
+            }
+
+            else if (isprint(c))
+            {
+               acValue[iValueIndex++] = c;
+               eState = STATE_IN_WORD;
             }
 
             else

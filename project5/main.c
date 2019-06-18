@@ -62,10 +62,164 @@ void handle_cd (char **argv) {
 	}
 }
 
+/* assume the last token is NULL */
+void free_tokens(char **tokens, size_t len) {
+	size_t i;
+	for (i = 0;i < len;i++) {
+		if (tokens[i]) {
+			free(tokens[i]);
+		}
+		
+	}
+	free(tokens);
+}
+
+void pexec_r(char **largs, char **rargs) {
+	/* get the output of largs and write it to pipe*/
+	int pipefd[2];
+	int pipe_exists = 0;
+	pid_t pid;
+	size_t i;
+
+	if (pipe(pipefd)){
+		perror("pipe");
+		return;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		perror("fork");
+		return;
+	}
+
+	if (!pid) {
+		/* child process, dup2, close reading pipe and execute */
+		if (dup2(pipefd[1],1) != 1){
+			perror("dup2");
+			return;
+		}
+
+		if (close(pipefd[0])) {
+			perror("close");
+			return;
+		}
+
+		/* remove all signal handlers */
+		if (signal(SIGINT, NULL) == SIG_ERR) {
+			perror("signal");
+			return;
+		}
+
+		if (signal(SIGQUIT, NULL) == SIG_ERR) {
+			perror("signal");
+			return;
+		}
+
+		if (execvp(largs[0], largs)) {
+			perror("execvp");
+		}
+
+		
+	} else {
+		/* parent process */
+		if (close(pipefd[1])) {
+			perror("close");
+			return;
+		}
+		/* check if pipe token exists in rargs */
+		for (i = 0;;i++){
+			if (!rargs[i]) {
+				break;
+			}
+			if (rargs[i][0] == '|') {
+				rargs[i] = NULL;
+				pipe_exists = 1;
+				break;
+			}
+		}
+
+		/* if pipe token does not exist, execute rargs */
+		if (!pipe_exists) {
+			pid_t pid = fork();
+
+			if (pid == -1) {
+				perror("fork");
+			}
+
+			if (!pid) {
+
+				/* remove all signal handlers */
+				if (signal(SIGINT, NULL) == SIG_ERR) {
+					perror("signal");
+					return;
+				}
+
+				if (signal(SIGQUIT, NULL) == SIG_ERR) {
+					perror("signal");
+					return;
+				}
+
+				if (dup2(pipefd[0],0) != 0) {
+					perror("dup2");
+					return;
+				}
+
+				if (execvp(rargs[0], rargs)) {
+					perror("execvp");
+					return;
+				}
+			} else {
+				/* wait for child */
+				if (waitpid(pid, NULL, 0) < 0) {
+					perror("waitpid");
+				}
+			}	
+		}
+	
+		/* wait for child to end */
+		if (waitpid(pid, NULL, 0) < 0) {
+			perror("waitpid");
+		}
+		
+	}
+
+}
+
+void exec(char **args) {
+	pid_t pid = fork();
+
+	if (pid == -1) {
+		perror("fork");
+	}
+
+	if (!pid) {
+
+		/* remove all signal handlers */
+		if (signal(SIGINT, NULL) == SIG_ERR) {
+			perror("signal");
+			return;
+		}
+
+		if (signal(SIGQUIT, NULL) == SIG_ERR) {
+			perror("signal");
+			return;
+		}
+
+		if (execvp(args[0], args)) {
+			perror("execvp");
+		}
+	} else {
+		/* wait for child */
+		if (waitpid(pid, NULL, 0) < 0) {
+			perror("waitpid");
+		}
+	}	
+}
+
 void eval(char *cmdline) {
 	char **tokens;
 	size_t len, i;
-	pid_t pid;
+	int pipe_exists = 0;
 
 	int lex_success = tokenize(cmdline, &tokens, &len);
 
@@ -100,47 +254,28 @@ void eval(char *cmdline) {
 	if (!strcmp(tokens[0],"exit")) {
 		exit(0);
 	}
-	/* if not in builtin, exeute it */
-
-	pid = fork();
-
-	if (pid == -1) {
-		perror("fork");
-		for (i = 0; i < len-1; i++) {
-			free(tokens[i]);
+	
+	/* execute pexec_r only if there is pipe token */
+	for (i = 0; i < len; i++) {
+		if (!tokens[i]) {
+			break;
 		}
-		free(tokens);
-		return;
+		if (tokens[i][0] == '|') {
+			tokens[i] = NULL;
+			pexec_r(&tokens[0], &tokens[i+1]);
+			pipe_exists = 1;
+			break;
+		}
 	}
 
-	if (!pid) {
+	if (!pipe_exists) {
+		exec(tokens);
+	}
+	
+	/* free tokens */
+	free_tokens(tokens, len);
 
-		/* remove all signal handlers */
-		if (signal(SIGINT, NULL) == SIG_ERR) {
-			perror("signal");
-			return;
-		}
-
-		if (signal(SIGQUIT, NULL) == SIG_ERR) {
-			perror("signal");
-			return;
-		}
-
-		if (execvp(tokens[0], tokens) == -1) {
-			perror("execve");
-		}
-	} else {
-		/* wait for child */
-		if (waitpid(pid, NULL, 0) < 0) {
-			perror("waitpid");
-		}
-
-		/* free tokens vector and each component inside */
-		for (i = 0; i < len-1; i++) {
-			free(tokens[i]);
-		}
-		free(tokens);
-	}	
+	
 }
 
 int ish_init() {
