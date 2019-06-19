@@ -15,11 +15,6 @@
 #include "dfa.h"
 #include "utils.h"
 
-/*--------------------------------------------------------------------*/
-
-
-
-/*--------------------------------------------------------------------*/
 
 static void freeToken(void *pvItem, void *pvExtra)
 
@@ -127,9 +122,14 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
                /* make sure previous token is word or dq token */
                size_t len = DynArray_getLength(oTokens);
-               if (len == 0 || nstdoutr){
+               if (len == 0){
                   return LEX_ERR_PIPE_UNSPECIFIED;
                }
+
+               if (nstdoutr) {
+                  return LEX_ERR_PIPE_MULTIPLE;
+               }
+               
                psToken = DynArray_get(oTokens,len-1);
                if (psToken->eType != TOKEN_DQ && psToken->eType != TOKEN_WORD) {
                   return LEX_ERR_PIPE_UNSPECIFIED;

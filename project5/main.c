@@ -472,7 +472,12 @@ int ish_init() {
 	}
 
 	while(fgets(line_buf, sizeof(line_buf), fp)) {
+		char *ptr = strchr(line_buf,'\n');
 		fflush(fp);
+		/* remove \n at line_buf */
+		if (ptr!=NULL) {
+			*ptr = 0;
+		}
 		printf("%% %s\n",line_buf);
 		eval(line_buf);
 	}
