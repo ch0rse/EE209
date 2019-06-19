@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <pwd.h>
 #include <time.h>
 #include <errno.h>
@@ -73,12 +74,16 @@ void exec_nowait(DynArray_T tokens, int stdin_fd, int stdout_fd, int close_fd) {
 
 		struct Token *filename = DynArray_get(tokens, i+1);
 		sliced = DynArray_slice(tokens,0,i);
-		FILE *fp = fopen(filename->pcValue,"r");
+		FILE *fp = fopen(filename->pcValue,"w");
 		if (!fp) {
-			LogErr("file does not exist");
+			LogErr("permission denied");
+			return;
+		} 
+		stdout_fd = fileno(fp);
+		if (fchmod(stdout_fd, S_IWUSR|S_IRUSR)) {
+			LogErr("permission denied");
 			return;
 		}
-		stdout_fd = fileno(fp);
 	}
 
 	if (!sliced) {
@@ -276,12 +281,16 @@ void exec(DynArray_T tokens, int stdin_fd, int stdout_fd, int close_fd) {
 
 		struct Token *filename = DynArray_get(tokens, i+1);
 		sliced = DynArray_slice(tokens,0,i);
-		FILE *fp = fopen(filename->pcValue,"r");
+		FILE *fp = fopen(filename->pcValue,"w");
 		if (!fp) {
 			LogErr("file does not exist");
 			return;
 		}
 		stdout_fd = fileno(fp);
+		if (fchmod(stdout_fd, S_IWUSR|S_IRUSR)) {
+			LogErr("permission denied");
+			return;
+		}
 	}
 
 	if (!sliced) {
