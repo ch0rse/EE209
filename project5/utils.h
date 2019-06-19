@@ -10,3 +10,5 @@ char *read_cmdline();
 void dump_stack(char **args);
 /* log error in the format of programname: error */
 void LogErr(char *err_str);
+/* creates a char ** from DynArray of tokens, return NULL on failure */
+char **make_argv(DynArray_T tokens);

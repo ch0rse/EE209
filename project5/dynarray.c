@@ -69,6 +69,18 @@ DynArray_T DynArray_new(int iLength)
 	
 	return oDynArray;
 }
+
+DynArray_T DynArray_slice(DynArray_T oDynArray, int start_idx, int end_idx) {
+	assert(end_idx > start_idx);
+	assert(end_idx <= DynArray_getLength(oDynArray));
+	DynArray_T out = DynArray_new(end_idx - start_idx);
+	int i;
+	for (i = 0; i < end_idx - start_idx; i++) {
+		DynArray_add(out, DynArray_get(oDynArray, i));
+	}
+	return out;
+}
+
 /*--------------------------------------------------------------------*/
 /* Free oDynArray. */
 void DynArray_free(DynArray_T oDynArray)

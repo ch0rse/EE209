@@ -24,30 +24,28 @@ struct process {
 	int pipefd[2];
 };
 
-static void exec_nowait(char **args, int stdin_fd, int stdout_fd, int close_fd) {
+static void exec_nowait(DynArray_T tokens, int stdin_fd, int stdout_fd, int close_fd) {
 
-	size_t i;
+	/* check if < or > is present in args */
+	size_t i, len;
 	enum RedirMode {REDIR_STDIN, REDIR_STDOUT, REDIR_NONE};
 	enum RedirMode mode = REDIR_NONE;
+	DynArray_T sliced = NULL;
 
-	for (i = 0;;i++) {
-		if (!args[i]) {
-			break;
-		}
-		if (args[i][0] == '<') {
+	len = DynArray_getLength(tokens);
+
+	for (i = 0; i < len;i++) {
+		struct Token *cur = DynArray_get(tokens, i);
+		if (cur->pcValue[0] == '<' && cur->eType == TOKEN_PIPE) {
 			mode = REDIR_STDIN;
-			free(args[i]);
-			args[i] = NULL;
 			break;
 		}
-		if (args[i][0] == '>') {
+		if (cur->pcValue[0] == '>' && cur->eType == TOKEN_PIPE) {
 			mode = REDIR_STDOUT;
-			free(args[i]);
-			args[i] = NULL;
 			break;
 		}
 
-		if (args[i][0] == '|') {
+		if (cur->pcValue[0] == '>' && cur->eType == TOKEN_PIPE) {
 			assert(1==0);
 		}
 	}
@@ -56,8 +54,9 @@ static void exec_nowait(char **args, int stdin_fd, int stdout_fd, int close_fd) 
 		if (stdin_fd != -1) {
 			LogErr("Multiple redirection of standard in/out");
 		}
-
-		FILE *fp = fopen(args[i+1],"r");
+		struct Token *filename = DynArray_get(tokens, i+1);
+		sliced = DynArray_slice(tokens,0,i);
+		FILE *fp = fopen(filename->pcValue,"r");
 		stdin_fd = fileno(fp);
 	}
 	
@@ -66,9 +65,16 @@ static void exec_nowait(char **args, int stdin_fd, int stdout_fd, int close_fd) 
 			LogErr("Multiple redirection of standard in/out");
 		}
 
-		FILE *fp = fopen(args[i+1],"w");
+		struct Token *filename = DynArray_get(tokens, i+1);
+		sliced = DynArray_slice(tokens,0,i);
+		FILE *fp = fopen(filename->pcValue,"r");
 		stdout_fd = fileno(fp);
 	}
+
+	if (!sliced) {
+		sliced = DynArray_Slice(tokens,0,len);
+	}
+	
 
 	pid_t pid = fork();
 
@@ -83,19 +89,11 @@ static void exec_nowait(char **args, int stdin_fd, int stdout_fd, int close_fd) 
 				perror("dup2");
 				exit(0);
 			}
-			if (close(stdin_fd)) {
-				perror("close");
-				exit(0);
-			}
 		}
 
 		if (stdout_fd != -1) {
 			if (dup2(stdout_fd, 1)!=1) {
 				perror("dup2");
-				exit(0);
-			}
-			if (close(stdout_fd)) {
-				perror("close");
 				exit(0);
 			}
 		}
@@ -120,14 +118,20 @@ static void exec_nowait(char **args, int stdin_fd, int stdout_fd, int close_fd) 
 
 		/* check for > or < symbol */
 
+		char **args = make_argv(sliced);
+		free_tokens(sliced);
+		free_tokens(tokens);
+
 		if (execvp(args[0], args)) {
 			perror("execvp");
 			exit(0);
 		}
 
+		free(args);
+
 	} else {
 		return;
-	}	
+	}
 }
 
 
@@ -183,19 +187,7 @@ void handle_cd (char **argv) {
 	}
 }
 
-/* assume the last token is NULL */
-void free_tokens(char **tokens, size_t len) {
-	size_t i;
-	for (i = 0;i < len;i++) {
-		if (tokens[i]) {
-			free(tokens[i]);
-		}
-		
-	}
-	free(tokens);
-}
-
-void pexec_r(char **largs, char **rargs, int stdin_fd) {
+void pexec_r(DynArray_T largs, DynArray_T rargs, int stdin_fd) {
 	/* get the output of largs and write it to pipe*/
 	int pipefd[2];
 	int found = 0;
@@ -223,43 +215,46 @@ void pexec_r(char **largs, char **rargs, int stdin_fd) {
 		}
 	}
 
+	
+
 	if (!found) {
 		exec_nowait(rargs, pipefd[0], -1, pipefd[1]);
 		close(pipefd[1]);
 		close(pipefd[0]);
 	} else {
+		DynArray_T lll = DynArray_slice(rargs, 0, i);
+		DynArray_T rrr =  DynArray_slice(rargs, i+1, len);
 		close(pipefd[1]);
-		pexec_r(&rargs[0], &rargs[i+1], pipefd[0]);
+		pexec_r(lll, rrr, pipefd[0]);
 		close(pipefd[0]);
+		free_tokens(lll);
+		free_tokens(rrr);
 	}
 	
 }
 
-void exec(char **args, int stdin_fd, int stdout_fd, int close_fd) {
+void exec(DynArray_T tokens, int stdin_fd, int stdout_fd, int close_fd) {
 
 	/* check if < or > is present in args */
-	size_t i;
+	size_t i, len;
 	enum RedirMode {REDIR_STDIN, REDIR_STDOUT, REDIR_NONE};
 	enum RedirMode mode = REDIR_NONE;
+	DynArray_T sliced = NULL;
 
-	for (i = 0;;i++) {
-		if (!args[i]) {
-			break;
-		}
-		if (args[i][0] == '<') {
+	len = DynArray_getLength(tokens);
+
+	for (i = 0; i < len;i++) {
+		struct Token *cur = DynArray_get(tokens, i);
+		if (cur->pcValue[0] == '<' && cur->eType == TOKEN_PIPE) {
 			mode = REDIR_STDIN;
-			free(args[i]);
-			args[i] = NULL;
 			break;
 		}
-		if (args[i][0] == '>') {
+		if (cur->pcValue[0] == '>' && cur->eType == TOKEN_PIPE) {
 			mode = REDIR_STDOUT;
-			free(args[i]);
-			args[i] = NULL;
 			break;
 		}
 
-		if (args[i][0] == '|') {
+		if (cur->pcValue[0] == '>' && cur->eType == TOKEN_PIPE) {
 			assert(1==0);
 		}
 	}
@@ -268,8 +263,9 @@ void exec(char **args, int stdin_fd, int stdout_fd, int close_fd) {
 		if (stdin_fd != -1) {
 			LogErr("Multiple redirection of standard in/out");
 		}
-
-		FILE *fp = fopen(args[i+1],"r");
+		struct Token *filename = DynArray_get(tokens, i+1);
+		sliced = DynArray_slice(tokens,0,i);
+		FILE *fp = fopen(filename->pcValue,"r");
 		stdin_fd = fileno(fp);
 	}
 	
@@ -278,8 +274,14 @@ void exec(char **args, int stdin_fd, int stdout_fd, int close_fd) {
 			LogErr("Multiple redirection of standard in/out");
 		}
 
-		FILE *fp = fopen(args[i+1],"w");
+		struct Token *filename = DynArray_get(tokens, i+1);
+		sliced = DynArray_slice(tokens,0,i);
+		FILE *fp = fopen(filename->pcValue,"r");
 		stdout_fd = fileno(fp);
+	}
+
+	if (!sliced) {
+		sliced = DynArray_Slice(tokens,0,len);
 	}
 	
 
@@ -325,10 +327,16 @@ void exec(char **args, int stdin_fd, int stdout_fd, int close_fd) {
 
 		/* check for > or < symbol */
 
+		char **args = make_argv(sliced);
+		free_tokens(sliced);
+		free_tokens(tokens);
+
 		if (execvp(args[0], args)) {
 			perror("execvp");
 			exit(0);
 		}
+
+		free(args);
 
 	} else {
 		/* wait for child */
@@ -341,45 +349,57 @@ void exec(char **args, int stdin_fd, int stdout_fd, int close_fd) {
 }
 
 void eval(char *cmdline) {
-	char **tokens;
+	DynArray_T tokens;
 	size_t len, i;
 	int pipe_exists = 0;
 
-	int lex_success = tokenize(cmdline, &tokens, &len);
+	int lex_success = tokenize(cmdline, &tokens);
 
-	if (!lex_success || len == 0) {
+	if (!lex_success) {
 		return;
 	}
+
+	struct Token *firstarg = (struct Token *)DynArray_get(tokens,0);
+	len = DynArray_getLength(tokens);
 	
 	/* check for builtins */
-	if (!strcmp(tokens[0],"setenv")) {
+	if (!strcmp(firstarg->pcValue,"setenv")) {
 		if (len !=2 && len != 3) {
 			LogErr("setenv takes 1 or 2 arguments");
 			return;
 		}
-		handle_setenv(tokens);
+		char **args = make_argv(tokens);
+		handle_setenv(args);
+		free_tokens(tokens);
+		free(args);
 		return;
 	}
 
-	if (!strcmp(tokens[0],"unsetenv")) {
+	if (!strcmp(firstarg->pcValue,"unsetenv")) {
 		if (len != 2) {
 			LogErr("unsetenv takes 1 argument");
 			return;
 		}
-		handle_unsetenv(tokens);
+		char **args = make_argv(tokens);
+		handle_unsetenv(args);
+		free_tokens(tokens);
+		free(args);
 		return;
 	}
 
-	if (!strcmp(tokens[0],"cd")) {
+	if (!strcmp(firstarg->pcValue,"cd")) {
 		if (len != 1 && len !=2) {
 			LogErr("cd takes 1 or 2 arguments");
 			return;
 		}
-		handle_cd(tokens);
+		char **args = make_argv(tokens);
+		handle_cd(args);
+		free_tokens(tokens);
+		free(args);
 		return;
 	}
 
-	if (!strcmp(tokens[0],"exit")) {
+	if (!strcmp(firstarg->pcValue,"exit")) {
 		if (len != 1) {
 			LogErr("exit does not take an argument");
 			return;
@@ -389,27 +409,29 @@ void eval(char *cmdline) {
 	
 	/* execute pexec_r only if there is pipe token */
 	for (i = 0; i < len; i++) {
-		if (!tokens[i]) {
-			break;
-		}
-		if (tokens[i][0] == '|') {
-			free(tokens[i]);
-			tokens[i] = NULL;
-			pexec_r(&tokens[0], &tokens[i+1],-1);
+		struct Token *cur = DynArray_get(tokens,i);
+		if (cur->pcValue[0] == '|' && cur->eType == TOKEN_PIPE ) {
+			DynArray_T ltokens = DynArray_slice(tokens,0,i);
+			DynArray_T rtokens = DynArray_slice(tokens,i+1,len);
+			pexec_r(ltokens, rtokens,-1);
 			pipe_exists = 1;
 			while(waitpid(-1,NULL,0) != -1){	};
+			/* free largs and rargs */
 			break;
 		}
 	}
 
 	if (!pipe_exists) {
-		exec(tokens,-1,-1,-1);
+		char **args = make_argv(tokens);
+		if (!args) {
+			LogErr("out of memory");
+		}
+		exec(args,-1,-1,-1);
+		free(args);
 	}
 	
 	/* free tokens */
-	free_tokens(tokens, len);
-
-	
+	free_tokens(tokens);
 }
 
 int ish_init() {

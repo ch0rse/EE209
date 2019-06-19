@@ -14,6 +14,9 @@ typedef struct DynArray * DynArray_T;
    NULL if insufficient memory is available. */
 DynArray_T DynArray_new(int iLength);
 
+/* slice a dynarray, equivalent to python's arr[start:end] */
+DynArray_T DynArray_slice(DynArray_T oDynArray, int start_idx, int end_idx);
+
 /* Free oDynArray. */
 void DynArray_free(DynArray_T oDynArray);
 

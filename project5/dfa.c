@@ -17,24 +17,7 @@
 
 /*--------------------------------------------------------------------*/
 
-enum {MAX_LINE_SIZE = 1024};
 
-enum {FALSE, TRUE};
-
-enum TokenType {TOKEN_DQ, TOKEN_WORD, TOKEN_PIPE};
-
-/*--------------------------------------------------------------------*/
-
-/* A Token is either a number or a word, expressed as a string. */
-
-struct Token
-{
-   enum TokenType eType;
-   /* The type of the token. */
-
-   char *pcValue;
-   /* The string which is the token's value. */
-};
 
 /*--------------------------------------------------------------------*/
 
@@ -86,15 +69,7 @@ static struct Token *makeToken(enum TokenType eTokenType,
 
 /*--------------------------------------------------------------------*/
 
-static int LexChk(char **argv) {
-   /* check for any bad use of < and >   
-
-   how it is done:
-   1. separate into segments by > and < and |
-   2. any segment after > is noted as file, and any segment before them is considered cmd
-   3. if there is file-cmd duplicate property LexChk returns LEX_ERR_PIPE_MULTIPLE
-   */
-
+static int lexChk(DynArray_T tokenv) {
    return LEX_SUCCESS;
 }
 
@@ -503,11 +478,17 @@ void free_token_dynarr(DynArray_T tokens) {
    DynArray_free(tokens);
 }
 
+void free_token_dynarr_preserve(DynArray_T tokens) {
+   DynArray_map(tokens, freeToken, NULL);
+   DynArray_free(tokens);
+}
+
+
+
 /* tokenize a command line passed from input */
-int tokenize (char *cmdline, char ***token_ptr, size_t *len_ptr) {
+int tokenize (char *cmdline, DynArray_T *token_ptr) {
 
    DynArray_T oTokens;
-   int i;
    enum LexResult result;
    
    oTokens = DynArray_new(0);
@@ -549,35 +530,12 @@ int tokenize (char *cmdline, char ***token_ptr, size_t *len_ptr) {
       }
       return 0;
    } else {
-      /* change dynarray to regular array */
-      size_t len = DynArray_getLength(oTokens) + 1;
-
-      struct Token **tokenv = calloc(sizeof(struct Token *), len);
-      char **argv = calloc(sizeof(char *),len);
-
-      DynArray_toArray(oTokens, (void **)tokenv);
-
-      /* no need to null-terminate, due to calloc */
-
-      for(i = 0; i < len-1; i++) {
-         argv[i] = tokenv[i]->pcValue;
-      }
-
-      /* free resources */
-      free(tokenv);
-
-      /* you should not free each token's pcValue, this should be done by the caller*/
-      DynArray_map(oTokens, freeToken_preserve_pcvalue, NULL);
-      DynArray_free(oTokens);
-
-
       /* do lexical check on argv */
-      result = LexChk(argv);
+      result = lexChk(oTokens);
 
       switch (result) {
          case LEX_SUCCESS:
-            *len_ptr = len-1;
-            *token_ptr = argv;
+            *token_ptr = oTokens;
             return 1;
          break;
 
@@ -607,7 +565,8 @@ int tokenize (char *cmdline, char ***token_ptr, size_t *len_ptr) {
       }
 
       /* free resources */
-      free(argv);
+      DynArray_map(oTokens, freeToken_preserve_pcvalue, NULL);
+      DynArray_free(oTokens);
       return 0;    
 
    }
