@@ -226,8 +226,8 @@ void pexec_r(DynArray_T largs, DynArray_T rargs, int stdin_fd) {
 		close(pipefd[1]);
 		pexec_r(lll, rrr, pipefd[0]);
 		close(pipefd[0]);
-		DynArray_free(lll);
-		DynArray_free(rrr);
+		free_token_dynarr_preserve(lll);
+		free_token_dynarr_preserve(rrr);
 	}
 	
 }
@@ -374,7 +374,7 @@ void eval(char *cmdline) {
 		}
 		char **args = make_argv(tokens);
 		handle_setenv(args);
-		DynArray_free(tokens);
+		free_token_dynarr_preserve(tokens);
 		free(args);
 		return;
 	}
@@ -386,7 +386,7 @@ void eval(char *cmdline) {
 		}
 		char **args = make_argv(tokens);
 		handle_unsetenv(args);
-		DynArray_free(tokens);
+		free_token_dynarr_preserve(tokens);
 		free(args);
 		return;
 	}
@@ -398,7 +398,7 @@ void eval(char *cmdline) {
 		}
 		char **args = make_argv(tokens);
 		handle_cd(args);
-		DynArray_free(tokens);
+		free_token_dynarr_preserve(tokens);
 		free(args);
 		return;
 	}
@@ -421,8 +421,6 @@ void eval(char *cmdline) {
 			pipe_exists = 1;
 			while(waitpid(-1,NULL,0) != -1){	};
 			/* free largs and rargs */
-			DynArray_free(ltokens);
-			DynArray_free(rtokens);
 			break;
 		}
 	}
@@ -430,9 +428,6 @@ void eval(char *cmdline) {
 	if (!pipe_exists) {
 		exec(tokens,-1,-1,-1);
 	}
-
-	DynArray_map(tokens, freeToken, NULL);
-	DynArray_free(tokens);
 	
 }
 

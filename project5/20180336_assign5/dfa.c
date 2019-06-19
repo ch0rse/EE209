@@ -16,6 +16,21 @@
 #include "utils.h"
 
 
+static void freeToken(void *pvItem, void *pvExtra)
+
+/* Free token pvItem.  pvExtra is unused. */
+
+{
+   struct Token *psToken = (struct Token*)pvItem;
+   free(psToken->pcValue);
+   free(psToken);
+}
+
+static void freeToken_preserve_pcvalue(void *pvItem, void *pvExtra) {
+   struct Token *psToken = (struct Token*)pvItem;
+   free(psToken);
+}
+
 
 /*--------------------------------------------------------------------*/
 
@@ -497,15 +512,16 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
 /*--------------------------------------------------------------------*/
 
-void freeToken(void *pvItem, void *pvExtra)
-
-/* Free token pvItem.  pvExtra is unused. */
-
-{
-   struct Token *psToken = (struct Token*)pvItem;
-   free(psToken->pcValue);
-   free(psToken);
+void free_token_dynarr(DynArray_T tokens) {
+   DynArray_map(tokens, freeToken, NULL);
+   DynArray_free(tokens);
 }
+
+void free_token_dynarr_preserve(DynArray_T tokens) {
+   DynArray_map(tokens, freeToken_preserve_pcvalue, NULL);
+   DynArray_free(tokens);
+}
+
 
 
 /* tokenize a command line passed from input */
@@ -524,8 +540,7 @@ int tokenize (char *cmdline, DynArray_T *token_ptr) {
    result = lexLine(cmdline, oTokens);
    if (result != LEX_SUCCESS) {
       /* free resources to prevent memory leak */
-      DynArray_map(oTokens, freeToken, NULL);
-      DynArray_free(oTokens);
+      free_token_dynarr(oTokens);
       /* print appropriate error message */
       switch (result) {
          case LEX_ERR_PIPE_MULTIPLE:
@@ -594,7 +609,7 @@ int tokenize (char *cmdline, DynArray_T *token_ptr) {
       }
 
       /* free resources */
-      DynArray_map(oTokens, freeToken, NULL);
+      DynArray_map(oTokens, freeToken_preserve_pcvalue, NULL);
       DynArray_free(oTokens);
       return 0;    
 
