@@ -479,7 +479,7 @@ void free_token_dynarr(DynArray_T tokens) {
 }
 
 void free_token_dynarr_preserve(DynArray_T tokens) {
-   DynArray_map(tokens, freeToken, NULL);
+   DynArray_map(tokens, freeToken_preserve_pcvalue, NULL);
    DynArray_free(tokens);
 }
 

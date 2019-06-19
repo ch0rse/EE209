@@ -5,8 +5,10 @@
 /*--------------------------------------------------------------------*/
 
 #include "dynarray.h"
+#include "utils.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 enum { MIN_PHYS_LENGTH = 2 };
 enum { GROWTH_FACTOR = 2 };
@@ -73,10 +75,10 @@ DynArray_T DynArray_new(int iLength)
 DynArray_T DynArray_slice(DynArray_T oDynArray, int start_idx, int end_idx) {
 	assert(end_idx > start_idx);
 	assert(end_idx <= DynArray_getLength(oDynArray));
-	DynArray_T out = DynArray_new(end_idx - start_idx);
+	DynArray_T out = DynArray_new(0);
 	int i;
 	for (i = 0; i < end_idx - start_idx; i++) {
-		DynArray_add(out, DynArray_get(oDynArray, i));
+		DynArray_add(out, DynArray_get(oDynArray, i + start_idx));
 	}
 	return out;
 }
@@ -106,6 +108,10 @@ void *DynArray_get(DynArray_T oDynArray, int iIndex)
 {
 	assert(oDynArray != NULL);
 	assert(iIndex >= 0);
+	if (iIndex >= oDynArray->iLength) {
+		breakpoint();
+		printf("iIndex = %d, len = %d\n",iIndex,oDynArray->iLength);
+	}
 	assert(iIndex < oDynArray->iLength);
 	assert(DynArray_isValid(oDynArray));
 	

@@ -67,16 +67,21 @@ char *read_cmdline() {
 
 char **make_argv(DynArray_T tokens) {
 	size_t len = DynArray_getLength(tokens)+1;
-	struct Token *tokenv = calloc(sizeof(struct Token *), len);
+	struct Token **tokenv = calloc(sizeof(struct Token *), len);
 	char **argv = calloc(sizeof(char *), len);
 	size_t i;
 
 	DynArray_toArray(tokens, (void **)tokenv);
 	
 	for (i = 0; i < len-1; i++){
-		argv[i] = tokenv[i].pcValue;
+		argv[i] = tokenv[i]->pcValue;
 	}
 
 	free(tokenv);
 	return argv;
+}
+
+void breakpoint(){
+	int x = 1;
+	x = x*2;
 }

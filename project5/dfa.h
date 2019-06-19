@@ -13,6 +13,8 @@ struct Token
 
 /* prevent memory leaks */
 void free_token_dynarr(DynArray_T tokens);
+void free_token_dynarr_preserve(DynArray_T tokens);
+
 /* tokenizes cmdline and makes argument array */
 int tokenize (char *cmdline, DynArray_T *token_ptr);
 

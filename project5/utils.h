@@ -12,3 +12,5 @@ void dump_stack(char **args);
 void LogErr(char *err_str);
 /* creates a char ** from DynArray of tokens, return NULL on failure */
 char **make_argv(DynArray_T tokens);
+
+void breakpoint();
