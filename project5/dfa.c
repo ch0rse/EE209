@@ -64,7 +64,46 @@ static struct Token *makeToken(enum TokenType eTokenType,
 
 /*--------------------------------------------------------------------*/
 
-static int lexChk(DynArray_T tokenv) {
+static int lexChk(DynArray_T tokens) {
+   /* 1. separate all chunks of tokens with <, > and | 
+      2. if filename consists of multiple tokens, return LEX_ERR_PIPE_FNAME_INVALID
+      3. if a token is a filename and cmd at the same time, return LEX_ERR_PIPE_MULTIPLE
+   */
+   size_t i, len;
+   int is_next_file = 0;
+
+   len = DynArray_getLength(tokens);
+
+   for (i = 0; i < len; i++) {
+      struct Token *cur = DynArray_get(tokens,i);
+      if (cur->pcValue[0] == '>' && cur->eType == TOKEN_PIPE) {
+         is_next_file = 1;
+         continue;
+      }
+      if (cur->pcValue[0] == '<' && cur->eType == TOKEN_PIPE) {
+         is_next_file = 1;
+         continue;
+      }
+      if (cur->pcValue[0] == '|' && cur->eType == TOKEN_PIPE) {
+         is_next_file = 0;
+         continue;
+      }
+      if (is_next_file) {
+         if (i < len-1) {
+            struct Token *next = DynArray_get(tokens,i+1);
+            if (next->eType != TOKEN_PIPE) {
+               return LEX_ERR_PIPE_FNAME_INVALID;
+            }
+            else if (next->pcValue[0] == '<') {
+               return LEX_ERR_PIPE_MULTIPLE;
+            }
+            else if (next->pcValue[0] == '>') {
+               return LEX_ERR_PIPE_MULTIPLE;
+            }
+         }
+      }
+
+   }
    return LEX_SUCCESS;
 }
 
@@ -129,7 +168,7 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                if (nstdoutr) {
                   return LEX_ERR_PIPE_MULTIPLE;
                }
-               
+
                psToken = DynArray_get(oTokens,len-1);
                if (psToken->eType != TOKEN_DQ && psToken->eType != TOKEN_WORD) {
                   return LEX_ERR_PIPE_UNSPECIFIED;
@@ -558,6 +597,11 @@ int tokenize (char *cmdline, DynArray_T *token_ptr) {
          case LEX_ERR_NPRINT:
             LogErr("Use of non-printable chars");
          break;
+
+         case LEX_ERR_PIPE_FNAME_INVALID:
+            LogErr("Filename consists of multiple tokens");
+         break;
+
 
          default:
             assert(FALSE);

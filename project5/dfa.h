@@ -21,4 +21,4 @@ int tokenize (char *cmdline, DynArray_T *token_ptr);
 /* lex err pipe: lex error with pipes */
 /* lex err quote: quote that is not closed */
 /* lex err nonalpha: use of non printable characters */
-enum LexResult {LEX_SUCCESS, LEX_ERR_PIPE_MULTIPLE, LEX_ERR_PIPE_UNSPECIFIED, LEX_ERR_QUOTE, LEX_ERR_MEM, LEX_ERR_NPRINT};
+enum LexResult {LEX_SUCCESS, LEX_ERR_PIPE_MULTIPLE, LEX_ERR_PIPE_UNSPECIFIED, LEX_ERR_PIPE_FNAME_INVALID, LEX_ERR_QUOTE, LEX_ERR_MEM, LEX_ERR_NPRINT};
