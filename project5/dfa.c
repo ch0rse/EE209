@@ -5,12 +5,15 @@
 /* automaton (DFA)                                                    */
 /*--------------------------------------------------------------------*/
 
-#include "dynarray.h"
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "dynarray.h"
+#include "dfa.h"
+#include "utils.h"
 
 /*--------------------------------------------------------------------*/
 
@@ -83,6 +86,18 @@ static struct Token *makeToken(enum TokenType eTokenType,
 
 /*--------------------------------------------------------------------*/
 
+static int LexChk(char **argv) {
+   /* check for any bad use of < and >   
+
+   how it is done:
+   1. separate into segments by > and < and |
+   2. any segment after > is noted as file, and any segment before them is considered cmd
+   3. if there is file-cmd duplicate property LexChk returns LEX_ERR_PIPE_MULTIPLE
+   */
+
+   return LEX_SUCCESS;
+}
+
 static int lexLine(const char *pcLine, DynArray_T oTokens)
 
 /* Lexically analyze string pcLine.  Populate oTokens with the
@@ -104,6 +119,11 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
    char c;
    char acValue[MAX_LINE_SIZE];
    struct Token *psToken;
+   int nbars, nstdinr, nstdoutr;
+
+   nbars = 0;
+   nstdinr = 0;
+   nstdoutr = 0;
 
    assert(pcLine != NULL);
    assert(oTokens != NULL);
@@ -114,9 +134,10 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
       c = pcLine[iLineIndex++];
       switch (eState)
       {
+         
          case STATE_START:
             if ((c == '\n') || (c == '\0'))
-               return TRUE;
+               return LEX_SUCCESS;
             
             else if (isspace(c))
                eState = STATE_START;
@@ -128,6 +149,17 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
             }
 
             else if (c == '|') {
+
+               /* make sure previous token is word or dq token */
+               size_t len = DynArray_getLength(oTokens);
+               if (len == 0 || nstdoutr){
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+               psToken = DynArray_get(oTokens,len-1);
+               if (psToken->eType != TOKEN_DQ && psToken->eType != TOKEN_WORD) {
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+
                acValue[0] = '|';
                acValue[1] = '\0';
 
@@ -135,21 +167,33 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                iValueIndex = 0;
                eState = STATE_START;
+               nbars++;
             }
 
+            /* should be erroneous if before a | token */
+
             else if (c == '>') {
+
+               /* make sure previous token is word or dq token */
+               size_t len = DynArray_getLength(oTokens);
+               if (len == 0){
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+               psToken = DynArray_get(oTokens,len-1);
+               if (psToken->eType != TOKEN_DQ && psToken->eType != TOKEN_WORD) {
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+
                acValue[0] = '>';
                acValue[1] = '\0';
 
@@ -157,21 +201,37 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                iValueIndex = 0;
                eState = STATE_START;
+               nstdoutr++;
             }
 
+            /* should be erroneous if after a | token */
+
             else if (c == '<') {
+
+               /* make sure previous token is word or dq token */
+               size_t len = DynArray_getLength(oTokens);
+               if (len == 0){
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+               psToken = DynArray_get(oTokens,len-1);
+               if (psToken->eType != TOKEN_DQ && psToken->eType != TOKEN_WORD) {
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+
+               if (nbars) {
+                  return LEX_ERR_PIPE_MULTIPLE;
+               }
+
                acValue[0] = '<';
                acValue[1] = '\0';
 
@@ -179,18 +239,17 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                iValueIndex = 0;
                eState = STATE_START;
+               nstdinr++;
             }
 
             else if (isprint(c))
@@ -202,28 +261,24 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
             else
             {
-               fprintf(stderr, "Invalid line at %c\n",c);
-               return FALSE;
+               return LEX_ERR_NPRINT;
             }
             break;
 
          case STATE_IN_DQ:
             
             if (c == '"') {
-               acValue[iValueIndex++] = c;
                acValue[iValueIndex] = '\0';
-               psToken = makeToken(TOKEN_DQ, acValue);
+               psToken = makeToken(TOKEN_DQ, &acValue[1]);
 
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                iValueIndex = 0;
@@ -236,9 +291,14 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                eState = STATE_IN_DQ;
             }
 
+            /* termination without closing */
+            else if ((c == '\n') || (c == '\0'))
+            {
+               return LEX_ERR_QUOTE;
+            }
+
             else {
-               fprintf(stderr, "Invalid line at %c\n",c);
-               return FALSE;
+               return LEX_ERR_NPRINT;
             }
             break;
 
@@ -251,16 +311,16 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                if (psToken == NULL)
                {
                   fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                if (! DynArray_add(oTokens, psToken))
                {
                   fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                iValueIndex = 0;
 
-               return TRUE;
+               return LEX_SUCCESS;
             }
             
             else if (isspace(c))
@@ -270,13 +330,11 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                psToken = makeToken(TOKEN_WORD, acValue);
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                iValueIndex = 0;
 
@@ -284,18 +342,26 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
             }
 
             else if (c == '|') {
+               /* make sure previous token is word or dq token */
+               size_t len = DynArray_getLength(oTokens);
+               psToken = DynArray_get(oTokens,len-1);
+               if (len == 0 || nstdoutr){
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+               if (psToken->eType != TOKEN_DQ && psToken->eType != TOKEN_WORD) {
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+
                /* first, make token of current word */
                acValue[iValueIndex] = '\0';
                psToken = makeToken(TOKEN_WORD, acValue);
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                /* next add pipe token */
                acValue[0] = '|';
@@ -306,32 +372,42 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
                if (psToken == NULL)
                {
                   fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                iValueIndex = 0;
                eState = STATE_START;
+               nbars++;
             }
 
+            /* should be erroneous if before a | token */
+
             else if (c == '>') {
+               /* make sure previous token is word or dq token */
+               size_t len = DynArray_getLength(oTokens);
+               if (len == 0){
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+               psToken = DynArray_get(oTokens,len-1);
+               if (psToken->eType != TOKEN_DQ && psToken->eType != TOKEN_WORD) {
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+
                /* first, make token of current word */
                acValue[iValueIndex] = '\0';
                psToken = makeToken(TOKEN_WORD, acValue);
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                /* next add pipe token */
                acValue[0] = '>';
@@ -341,33 +417,45 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                iValueIndex = 0;
                eState = STATE_START;
+               nstdoutr++;
             }
 
+            /* should be erroneous if after a | token */
+
             else if (c == '<') {
-               /* first, make token of current word */
+               /* make sure previous token is word or dq token */
+               size_t len = DynArray_getLength(oTokens);
+               if (len == 0){
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+               psToken = DynArray_get(oTokens,len-1);
+               if (psToken->eType != TOKEN_DQ && psToken->eType != TOKEN_WORD) {
+                  return LEX_ERR_PIPE_UNSPECIFIED;
+               }
+
+               if (nbars) {
+                  return LEX_ERR_PIPE_MULTIPLE;
+               }
+
                acValue[iValueIndex] = '\0';
                psToken = makeToken(TOKEN_WORD, acValue);
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
                /* next add pipe token */
                acValue[0] = '<';
@@ -377,18 +465,17 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
                if (psToken == NULL)
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                if (! DynArray_add(oTokens, psToken))
                {
-                  fprintf(stderr, "Cannot allocate memory\n");
-                  return FALSE;
+                  return LEX_ERR_MEM;
                }
 
                iValueIndex = 0;
                eState = STATE_START;
+               nstdinr++;
             }
 
             else if (isprint(c))
@@ -399,8 +486,7 @@ static int lexLine(const char *pcLine, DynArray_T oTokens)
 
             else
             {
-               fprintf(stderr, "Invalid line at %c\n",c);
-               return FALSE;
+               return LEX_ERR_NPRINT;
             }
             break;
 
@@ -421,7 +507,8 @@ void free_token_dynarr(DynArray_T tokens) {
 int tokenize (char *cmdline, char ***token_ptr, size_t *len_ptr) {
 
    DynArray_T oTokens;
-   int iSuccessful,i;
+   int i;
+   enum LexResult result;
    
    oTokens = DynArray_new(0);
    if (oTokens == NULL)
@@ -430,10 +517,36 @@ int tokenize (char *cmdline, char ***token_ptr, size_t *len_ptr) {
       exit(EXIT_FAILURE);
    }
 
-   iSuccessful = lexLine(cmdline, oTokens);
-   if (!iSuccessful) {
+   result = lexLine(cmdline, oTokens);
+   if (result != LEX_SUCCESS) {
       /* free resources to prevent memory leak */
       free_token_dynarr(oTokens);
+      /* print appropriate error message */
+      switch (result) {
+         case LEX_ERR_PIPE_MULTIPLE:
+            LogErr("Multiple redirection of standard in/out");
+         break;
+
+         case LEX_ERR_PIPE_UNSPECIFIED:
+            LogErr("Pipe or redirection destination not specified");
+         break;
+
+         case LEX_ERR_QUOTE:
+            LogErr("Could not find quote pair");
+         break;
+
+         case LEX_ERR_MEM:
+            LogErr("Out of memory");
+         break;
+
+         case LEX_ERR_NPRINT:
+            LogErr("Use of non-printable chars");
+         break;
+
+         default:
+            assert(FALSE);
+         break;
+      }
       return 0;
    } else {
       /* change dynarray to regular array */
@@ -457,8 +570,45 @@ int tokenize (char *cmdline, char ***token_ptr, size_t *len_ptr) {
       DynArray_map(oTokens, freeToken_preserve_pcvalue, NULL);
       DynArray_free(oTokens);
 
-      *len_ptr = len-1;
-      *token_ptr = argv;
-      return 1;
+
+      /* do lexical check on argv */
+      result = LexChk(argv);
+
+      switch (result) {
+         case LEX_SUCCESS:
+            *len_ptr = len-1;
+            *token_ptr = argv;
+            return 1;
+         break;
+
+         case LEX_ERR_PIPE_MULTIPLE:
+            LogErr("Multiple redirection of standard in/out");
+         break;
+
+         case LEX_ERR_PIPE_UNSPECIFIED:
+            LogErr("Pipe or redirection destination not specified");
+         break;
+
+         case LEX_ERR_QUOTE:
+            LogErr("Could not find quote pair");
+         break;
+
+         case LEX_ERR_MEM:
+            LogErr("Out of memory");
+         break;
+
+         case LEX_ERR_NPRINT:
+            LogErr("Use of non-printable chars");
+         break;
+
+         default:
+            assert(FALSE);
+         break;
+      }
+
+      /* free resources */
+      free(argv);
+      return 0;    
+
    }
 }

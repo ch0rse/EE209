@@ -7,6 +7,8 @@
 #include <sys/wait.h>
 #include <pwd.h>
 #include <time.h>
+#include <errno.h>
+#include <assert.h>
 #include "dynarray.h"
 #include "main.h"
 #include "utils.h"
@@ -14,6 +16,120 @@
 
 extern char **environ;
 static time_t last_time = 0;
+static DynArray_T plist = NULL;
+char *prog_name;
+
+struct process {
+	pid_t pid;
+	int pipefd[2];
+};
+
+static void exec_nowait(char **args, int stdin_fd, int stdout_fd, int close_fd) {
+
+	size_t i;
+	enum RedirMode {REDIR_STDIN, REDIR_STDOUT, REDIR_NONE};
+	enum RedirMode mode = REDIR_NONE;
+
+	for (i = 0;;i++) {
+		if (!args[i]) {
+			break;
+		}
+		if (args[i][0] == '<') {
+			mode = REDIR_STDIN;
+			free(args[i]);
+			args[i] = NULL;
+			break;
+		}
+		if (args[i][0] == '>') {
+			mode = REDIR_STDOUT;
+			free(args[i]);
+			args[i] = NULL;
+			break;
+		}
+
+		if (args[i][0] == '|') {
+			assert(1==0);
+		}
+	}
+
+	if (mode == REDIR_STDIN) {
+		if (stdin_fd != -1) {
+			LogErr("Multiple redirection of standard in/out");
+		}
+
+		FILE *fp = fopen(args[i+1],"r");
+		stdin_fd = fileno(fp);
+	}
+	
+	else if (mode == REDIR_STDOUT) {
+		if (stdout_fd != -1) {
+			LogErr("Multiple redirection of standard in/out");
+		}
+
+		FILE *fp = fopen(args[i+1],"w");
+		stdout_fd = fileno(fp);
+	}
+
+	pid_t pid = fork();
+
+	if (pid == -1) {
+		perror("fork");
+	}
+
+	if (!pid) {
+
+		if (stdin_fd != -1) {
+			if (dup2(stdin_fd, 0)!=0) {
+				perror("dup2");
+				exit(0);
+			}
+			if (close(stdin_fd)) {
+				perror("close");
+				exit(0);
+			}
+		}
+
+		if (stdout_fd != -1) {
+			if (dup2(stdout_fd, 1)!=1) {
+				perror("dup2");
+				exit(0);
+			}
+			if (close(stdout_fd)) {
+				perror("close");
+				exit(0);
+			}
+		}
+
+		if (close_fd != -1) {
+			if (close(close_fd)) {
+				perror("close");
+				exit(0);
+			}
+		}
+
+		/* remove all signal handlers */
+		if (signal(SIGINT, NULL) == SIG_ERR) {
+			perror("signal");
+			exit(0);
+		}
+
+		if (signal(SIGQUIT, NULL) == SIG_ERR) {
+			perror("signal");
+			exit(0);
+		}
+
+		/* check for > or < symbol */
+
+		if (execvp(args[0], args)) {
+			perror("execvp");
+			exit(0);
+		}
+
+	} else {
+		return;
+	}	
+}
+
 
 void sigint_handler(int signo) {
 	/* do nothing */
@@ -33,7 +149,12 @@ void sigquit_handler(int signo) {
 }
 
 void handle_setenv (char **argv) {
-	if(setenv(argv[1],argv[2],1) == -1) {
+	if (argv[2] == NULL){
+		if(setenv(argv[1],"",1) == -1){
+			perror("setenv");
+		}
+	}
+	else if(setenv(argv[1],argv[2],1) == -1) {
 		perror("setenv");
 	}
 }
@@ -47,7 +168,7 @@ void handle_cd (char **argv) {
 		/* cd to home directory */
 		char *homedir = get_homedir();
 		if (!homedir) {
-			fputs("cd: could not locate home directory\n",stderr);
+			fputs("cd: could not locate home directory",stderr);
 			return;
 		}
 
@@ -74,130 +195,94 @@ void free_tokens(char **tokens, size_t len) {
 	free(tokens);
 }
 
-void pexec_r(char **largs, char **rargs, int readpipe) {
+void pexec_r(char **largs, char **rargs, int stdin_fd) {
 	/* get the output of largs and write it to pipe*/
 	int pipefd[2];
-	int pipe_exists = 0;
-	pid_t pid;
-	size_t i;
-
+	int found = 0;
+  	size_t i;
 
 	if (pipe(pipefd)){
 		perror("pipe");
 		return;
 	}
 
-	pid = fork();
-	if (pid == -1) {
-		perror("fork");
-		return;
+	/* if there are no < s don't redirect stdin */ 
+	exec_nowait(largs, stdin_fd, pipefd[1], pipefd[0]);
+
+	/* handle rargs next, check if there exists a bar (|) token in rargs */
+
+	for (i = 0;; i++) {
+		if (!rargs[i]) {
+			break;
+		}
+		if (rargs[i][0] == '|') {
+			found = 1;
+			free(rargs[i]);
+			rargs[i] = NULL;
+			break;
+		}
 	}
 
-	if (!pid) {
-		/* child process, dup2, close reading pipe and execute */
-		if (readpipe != -1) {
-			if (dup2(readpipe,0) != 0) {
-				perror("dup2");
-				return;
-			}
-		}
-		if (dup2(pipefd[1],1) != 1){
-			perror("dup2");
-			return;
-		}
-
-		if (close(pipefd[0])) {
-			perror("close");
-			return;
-		}
-
-		/* remove all signal handlers */
-		if (signal(SIGINT, NULL) == SIG_ERR) {
-			perror("signal");
-			return;
-		}
-
-		if (signal(SIGQUIT, NULL) == SIG_ERR) {
-			perror("signal");
-			return;
-		}
-
-		if (execvp(largs[0], largs)) {
-			perror("execvp");
-		}
-
-		
+	if (!found) {
+		exec_nowait(rargs, pipefd[0], -1, pipefd[1]);
+		close(pipefd[1]);
+		close(pipefd[0]);
 	} else {
-		/* parent process */
-		if (close(pipefd[1])) {
-			perror("close");
-			return;
-		}
-		/* check if pipe token exists in rargs */
-		for (i = 0;;i++){
-			if (!rargs[i]) {
-				break;
-			}
-			if (rargs[i][0] == '|') {
-				rargs[i] = NULL;
-				pipe_exists = 1;
-				break;
-			}
-		}
-
-		/* if pipe token does not exist, execute rargs */
-		if (!pipe_exists) {
-			pid_t pid = fork();
-
-			if (pid == -1) {
-				perror("fork");
-			}
-
-			if (!pid) {
-
-				/* remove all signal handlers */
-				if (signal(SIGINT, NULL) == SIG_ERR) {
-					perror("signal");
-					return;
-				}
-
-				if (signal(SIGQUIT, NULL) == SIG_ERR) {
-					perror("signal");
-					return;
-				}
-
-				if (dup2(pipefd[0],0) != 0) {
-					perror("dup2");
-					return;
-				}
-
-				if (execvp(rargs[0], rargs)) {
-					perror("execvp");
-					return;
-				}
-			} else {
-				/* wait for child */
-				if (waitpid(pid, NULL, 0) < 0) {
-					perror("waitpid");
-				}
-			}	
-		}
-		/* if pipe does exist, call pexec_r in a recursive manner */
-		else {
-			/* must connect with pipefd[0]<-stdin */
-			pexec_r(&rargs[0],&rargs[i+1], pipefd[0]);	
-		}
-	
-		/* wait for child to end */
-		if (waitpid(pid, NULL, 0) < 0) {
-			perror("waitpid");
-		}
-		
+		close(pipefd[1]);
+		pexec_r(&rargs[0], &rargs[i+1], pipefd[0]);
+		close(pipefd[0]);
 	}
-
+	
 }
 
-void exec(char **args) {
+void exec(char **args, int stdin_fd, int stdout_fd, int close_fd) {
+
+	/* check if < or > is present in args */
+	size_t i;
+	enum RedirMode {REDIR_STDIN, REDIR_STDOUT, REDIR_NONE};
+	enum RedirMode mode = REDIR_NONE;
+
+	for (i = 0;;i++) {
+		if (!args[i]) {
+			break;
+		}
+		if (args[i][0] == '<') {
+			mode = REDIR_STDIN;
+			free(args[i]);
+			args[i] = NULL;
+			break;
+		}
+		if (args[i][0] == '>') {
+			mode = REDIR_STDOUT;
+			free(args[i]);
+			args[i] = NULL;
+			break;
+		}
+
+		if (args[i][0] == '|') {
+			assert(1==0);
+		}
+	}
+
+	if (mode == REDIR_STDIN) {
+		if (stdin_fd != -1) {
+			LogErr("Multiple redirection of standard in/out");
+		}
+
+		FILE *fp = fopen(args[i+1],"r");
+		stdin_fd = fileno(fp);
+	}
+	
+	else if (mode == REDIR_STDOUT) {
+		if (stdout_fd != -1) {
+			LogErr("Multiple redirection of standard in/out");
+		}
+
+		FILE *fp = fopen(args[i+1],"w");
+		stdout_fd = fileno(fp);
+	}
+	
+
 	pid_t pid = fork();
 
 	if (pid == -1) {
@@ -206,25 +291,52 @@ void exec(char **args) {
 
 	if (!pid) {
 
+		if (stdin_fd != -1) {
+			if (dup2(stdin_fd, 0)!=0) {
+				perror("dup2");
+				exit(0);
+			}
+		}
+
+		if (stdout_fd != -1) {
+			if (dup2(stdout_fd, 1)!=1) {
+				perror("dup2");
+				exit(0);
+			}
+		}
+
+		if (close_fd != -1) {
+			if (close(close_fd)) {
+				perror("close");
+				exit(0);
+			}
+		}
+
 		/* remove all signal handlers */
 		if (signal(SIGINT, NULL) == SIG_ERR) {
 			perror("signal");
-			return;
+			exit(0);
 		}
 
 		if (signal(SIGQUIT, NULL) == SIG_ERR) {
 			perror("signal");
-			return;
+			exit(0);
 		}
+
+		/* check for > or < symbol */
 
 		if (execvp(args[0], args)) {
 			perror("execvp");
+			exit(0);
 		}
+
 	} else {
 		/* wait for child */
-		if (waitpid(pid, NULL, 0) < 0) {
+		if (waitpid(pid,NULL,0)==-1){
 			perror("waitpid");
+			return;
 		}
+
 	}	
 }
 
@@ -241,8 +353,8 @@ void eval(char *cmdline) {
 	
 	/* check for builtins */
 	if (!strcmp(tokens[0],"setenv")) {
-		if (len !=2 || len != 3) {
-			fputs("setenv requires 1 or 2 arguments\n",stderr);
+		if (len !=2 && len != 3) {
+			LogErr("setenv takes 1 or 2 arguments");
 			return;
 		}
 		handle_setenv(tokens);
@@ -251,7 +363,7 @@ void eval(char *cmdline) {
 
 	if (!strcmp(tokens[0],"unsetenv")) {
 		if (len != 2) {
-			fputs("unsetenv takes 1 argument\n",stderr);
+			LogErr("unsetenv takes 1 argument");
 			return;
 		}
 		handle_unsetenv(tokens);
@@ -259,11 +371,19 @@ void eval(char *cmdline) {
 	}
 
 	if (!strcmp(tokens[0],"cd")) {
+		if (len != 1 && len !=2) {
+			LogErr("cd takes 1 or 2 arguments");
+			return;
+		}
 		handle_cd(tokens);
 		return;
 	}
 
 	if (!strcmp(tokens[0],"exit")) {
+		if (len != 1) {
+			LogErr("exit does not take an argument");
+			return;
+		}
 		exit(0);
 	}
 	
@@ -273,15 +393,17 @@ void eval(char *cmdline) {
 			break;
 		}
 		if (tokens[i][0] == '|') {
+			free(tokens[i]);
 			tokens[i] = NULL;
 			pexec_r(&tokens[0], &tokens[i+1],-1);
 			pipe_exists = 1;
+			while(waitpid(-1,NULL,0) != -1){	};
 			break;
 		}
 	}
 
 	if (!pipe_exists) {
-		exec(tokens);
+		exec(tokens,-1,-1,-1);
 	}
 	
 	/* free tokens */
@@ -295,6 +417,12 @@ int ish_init() {
 	char *homedir;
 	FILE *fp;
 	char line_buf[MAX_CMDLINE_LEN];
+	/* init process vectors */
+	plist = DynArray_new(0);
+	if (!plist) {
+		LogErr("plist failed to initialize");
+		exit(0);
+	}
 
 	/* first install signal handlers they will be inherited to children so make sure to remove them before execve*/
 	if (signal(SIGINT, sigint_handler) == SIG_ERR) {
@@ -320,21 +448,26 @@ int ish_init() {
 	memset(ishrc_path, 0, len);
 
 	if (snprintf(ishrc_path, len-1, "%s/.ishrc", homedir) > len) {
-		fputs("error: home directory path is too long",stderr);
+		LogErr("error: home directory path is too long");
 		return 0;
 	}
 
 	fp = fopen(ishrc_path, "r");
 
 	if(!fp) {
-		fprintf(stderr,"ishrc at path %s was not found\n",ishrc_path);
+		char buf[0x100];
+		snprintf(buf,sizeof(buf),"ishrc at path %s was not found",ishrc_path);
+		LogErr(buf);
 		return 0;
 	}
 
 	while(fgets(line_buf, sizeof(line_buf), fp)) {
+		fflush(fp);
 		printf("%% %s\n",line_buf);
 		eval(line_buf);
 	}
+
+	fclose(fp);
 
 	return 1;
 }
@@ -342,21 +475,27 @@ int ish_init() {
 
 int main(int argc, char **argv) {
 
-	if (!ish_init()) {
-		/* don't terminate the shell even if ish init fails */
-		fputs("ish_init failed\n",stderr);
+	/* register argv[0] */
+	prog_name = strdup(argv[0]);
+	if (!prog_name) {
+		perror("strdup");
+		LogErr("argv copying failed, exiting");
+		exit(-1);
 	}
+
+	ish_init();
 
 	while(1) {
 
 		if (!prompt()) {
-			fputs("prompt failed\n",stderr);
+			LogErr("prompt failed");
 			continue;
 		}
 
 		char *cmdline = read_cmdline();
 		if (!cmdline) {
-			fputs("getline failed\n",stderr);
+			free(cmdline);
+			break;
 		} else {
 			eval(cmdline);
 			free(cmdline);

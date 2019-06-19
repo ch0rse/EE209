@@ -1,5 +1,4 @@
 must implement:
 
-1. allow special characters
-2. error handling based on manual
-3. pipes
+1. fix bugs regarding "
+2. appropriate error handling (argv[0] is not good)

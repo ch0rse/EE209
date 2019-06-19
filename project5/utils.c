@@ -7,7 +7,12 @@
 
 #define PROMPT_LEN 2
 
+extern char *prog_name;
 static char prompt_str[] = "% ";
+
+void LogErr(char *errstr) {
+	fprintf(stderr,"%s: %s\n",prog_name, errstr);
+}
 
 void dump_stack(char **args) {
 	size_t i;
@@ -52,7 +57,6 @@ char *read_cmdline() {
 	char buf[MAX_CMDLINE_LEN];
 
 	if (!fgets(buf, sizeof(buf), stdin)) {
-		perror("fgets");
 		return NULL;
 	}
 

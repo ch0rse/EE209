@@ -7,6 +7,6 @@ char *get_homedir();
 /* pre-load command lines from .ishrc and install signal handlers */
 int ish_init (void);
 /* executes largs | rargs in a recursive manner*/
-void pexec_r(char **largs, char **rargs, int readpipe);
+void pexec_r(char **largs, char **rargs, int stdin_fd);
 /* executes args */
-void exec(char **args);
+void exec(char **args, int stdin_fd, int stdout_fd, int close_fd);

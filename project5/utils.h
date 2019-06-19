@@ -8,3 +8,5 @@ int prompt();
 char *read_cmdline();
 /* for debug purposes, dump argv */
 void dump_stack(char **args);
+/* log error in the format of programname: error */
+void LogErr(char *err_str);
